@@ -14,7 +14,8 @@ nothingClaw is a single-process Bun app that connects messaging channels (Telegr
 - **Two agent CLIs, one wire format.** Pick Google's Gemini CLI or Anthropic's Claude Code. Switch any time with `bun run provider`.
 - **Multi-channel.** Telegram, Slack (Socket Mode), WhatsApp (Baileys, QR auth). Enable any combination.
 - **Image support.** WhatsApp images are downloaded and passed to the agent via `@<path>` for vision.
-- **MCP tool — `send_message`.** For proactive / multi-part replies. Add more by dropping files into `src/mcp/`.
+- **Voice in and out (optional).** WhatsApp voice notes are transcribed by a local Whisper sidecar; the agent can reply with synthesized speech via a local Kokoro sidecar. No cloud, no Docker.
+- **MCP tools — `send_message`, `speak`.** For proactive / multi-part replies and voice synthesis. Add more by dropping files into `src/mcp/`.
 - **Per-thread serialization.** Two messages from the same chat can never race two agent subprocesses.
 - **Auto-detected login.** If you've already authed `gemini` or `claude` in another terminal, setup skips the login step.
 - **Persistent agent memory.** `MEMORY.md` is editable by the agent itself for long-term recall.
@@ -24,6 +25,7 @@ nothingClaw is a single-process Bun app that connects messaging channels (Telegr
 - macOS or Linux (or WSL). Setup auto-installs Bun.
 - Node + npm (for installing the agent CLI globally).
 - A bot/app token from each channel you want to enable.
+- **Voice (optional):** Python 3.10+ and `ffmpeg`. On macOS: `brew install python@3.11 ffmpeg`.
 
 ## Quick start
 
@@ -58,6 +60,10 @@ bun run provider [gemini|claude]    # switch agent provider (interactive if no a
 bun run whatsapp reset              # clear WhatsApp auth → forces a new QR
 bun run whatsapp status             # show link state + cached media count
 bun run whatsapp clear-media        # purge data/whatsapp-media/
+bun run voice install               # one-time: create venv, install whisper + kokoro
+bun run voice start                 # start both sidecars (detached)
+bun run voice status                # show whether each sidecar is running + healthy
+bun run voice stop                  # stop both sidecars
 ```
 
 ## Architecture
@@ -67,19 +73,71 @@ bun run whatsapp clear-media        # purge data/whatsapp-media/
 │  channel adapter  │ ── text ──▶   │  handleMessage           │
 │  · telegram       │               │  · persist to sqlite     │
 │  · slack          │               │  · build prompt          │
-│  · whatsapp       │               │  · spawn gemini / claude │
-└───────────────────┘               │  · send reply            │
-        ▲                           └──────────────────────────┘
+│  · whatsapp       │   audio? ──▶  │  · spawn gemini / claude │
+└───────────────────┘   whisper     │  · send reply            │
+        ▲               :9000       └──────────────────────────┘
         │                                       │
+        │                              speak()  │  ← MCP
+        │                            kokoro     │
+        │                            :9001      │
         └─── router.send ◀── outbox drain ◀─────┘
 ```
 
 Single process. SQLite (`data/nothingclaw.db`) is the only state:
 
 - `messages` — conversation history per thread
-- `outbox` — async messages queued by the agent's `send_message` MCP tool
+- `outbox` — async messages queued by the agent's `send_message` / `speak` MCP tools (text and audio share one queue via an `audio_path` column)
 
-The agent CLI runs as a subprocess per incoming message. Its built-in tools (shell, file read/write/edit, glob, grep, web fetch/search) plus our tiny MCP server give it everything it needs.
+The agent CLI runs as a subprocess per incoming message. Its built-in tools (shell, file read/write/edit, glob, grep, web fetch/search) plus our tiny MCP server give it everything it needs. Voice support adds two optional Python sidecars (Whisper + Kokoro) on localhost — no Docker.
+
+## Voice (optional)
+
+WhatsApp voice notes get transcribed; the agent can reply in synthesized speech. Both directions run locally.
+
+### Install
+
+```bash
+# One-time prereqs
+brew install python@3.11 ffmpeg          # macOS
+# or: sudo apt install python3 python3-venv ffmpeg
+
+# Create venv, install faster-whisper + kokoro-onnx, download models (~650MB total)
+bun run voice install
+```
+
+Setup will offer to do all of this automatically if you say `y` to *"Enable voice transcription?"*.
+
+### Run
+
+```bash
+bun run voice start          # starts both sidecars (detached, PIDs in data/voice-*.pid)
+bun run voice status         # whisper: ok · kokoro: ok
+echo 'NOTHINGCLAW_VOICE=1' >> .env
+bun run start                # restart the bot
+```
+
+Send a voice note from WhatsApp. You should see:
+
+```
+[whatsapp] in  …@lid: [Voice]: hi how's the weather
+[claude] start  whatsapp:…@lid
+[claude] end    whatsapp:…@lid  4.8s  0 chars
+[whatsapp] out (voice, 18.4KB) …@lid: It's sunny and 24…
+```
+
+### How it works
+
+- **In:** the WhatsApp adapter detects `audioMessage`, downloads the ogg/opus blob, POSTs to `http://127.0.0.1:9000/transcribe`, and prepends `[Voice]: <transcript>` to whatever text the user also typed. From the agent's perspective it's just text.
+- **Out:** the agent calls the `speak({ text })` MCP tool. The tool POSTs to `http://127.0.0.1:9001/v1/audio/speech` (Kokoro is OpenAI-compatible) and writes the returned ogg/opus to `data/voice-out/<id>.ogg`. An `outbox` row with `audio_path` set goes onto the queue; the channel adapter sends it as a proper WhatsApp voice note (`ptt: true`).
+- Agent persona files (`GEMINI.md` / `CLAUDE.md`) tell the agent to call `speak` whenever the user's message starts with `[Voice]:` and to default to voice-only replies in that case.
+
+### Voices
+
+The default voice is `af_heart`. Override globally with `KOKORO_VOICE=…` in `.env`, or per-call by passing `voice` to the `speak` tool. Built-in voices include `af_heart`, `af_bella`, `af_nicole`, `am_adam`, `am_michael`, `bf_emma`, `bm_george`.
+
+### Model sizes
+
+Whisper defaults to `base` (~150MB, good for English + accents). Override with `WHISPER_MODEL=small` for better accuracy or `tiny` for faster transcription on slow hardware. Re-run `bun run voice install` after changing.
 
 ## Configuration (`.env`)
 
@@ -92,6 +150,12 @@ The agent CLI runs as a subprocess per incoming message. Its built-in tools (she
 | `SLACK_BOT_TOKEN` | per-channel | `xoxb-…` |
 | `SLACK_APP_TOKEN` | per-channel | `xapp-…` (needs `connections:write`) |
 | `NOTHINGCLAW_WHATSAPP` | per-channel | Set to `1`; auth via QR on first start |
+| `NOTHINGCLAW_VOICE` | per-feature | Set to `1` to enable Whisper STT + Kokoro TTS (sidecars must be running) |
+| `WHISPER_URL` | optional | Whisper sidecar URL (default `http://127.0.0.1:9000`) |
+| `WHISPER_MODEL` | optional | `tiny` / `base` / `small` / `medium` / `large` (default `base`) |
+| `KOKORO_URL` | optional | Kokoro sidecar URL (default `http://127.0.0.1:9001`) |
+| `KOKORO_VOICE` | optional | Default voice (`af_heart`, `af_bella`, `am_adam`, …) |
+| `KOKORO_FORMAT` | optional | `ogg` (proper voice note) / `mp3` / `wav` |
 | `GEMINI_API_KEY` | optional | Use a paid key instead of OAuth (higher quota) |
 | `NOTHINGCLAW_AGENT_TIMEOUT_MS` | optional | Per-message timeout (default `120000`) |
 | `NOTHINGCLAW_WHATSAPP_VERBOSE` | optional | Set to `1` to dump Baileys protocol logs |
@@ -127,8 +191,11 @@ The agent CLI's own credentials live in your home directory (`~/.gemini/`, `~/.c
 | WhatsApp keeps cycling (`code=405/428`) | Outdated Baileys protocol | `bun update baileys` |
 | Connected but no replies | Replaying history (`type: append`) — only `notify` is processed | Wait a few seconds, then send a fresh message |
 | `[gemini] timeout after 120000ms` | Slow tool loop or quota retries | Bump `NOTHINGCLAW_AGENT_TIMEOUT_MS` or switch provider |
-| `[whatsapp] skipped non-text (audioMessage)` | Audio not yet supported | Text + images only for now |
+| `[whatsapp] skipped non-text (audioMessage)` | Voice support disabled | `bun run voice start` and set `NOTHINGCLAW_VOICE=1` |
+| `[whatsapp] transcribe failed` | Whisper sidecar down or unhealthy | `bun run voice status`; restart with `bun run voice restart` |
+| `Speech synthesis failed: … kokoro sidecar` | Kokoro sidecar not running | `bun run voice start` |
 | `[whatsapp] giving up after 5 failed connection attempts` | Too many linked devices, or geo block | Unlink from phone, or try a different network |
+| Same reply sent 2-3 times | Was a drain-race bug — fixed in `src/index.ts` | Pull latest; restart |
 
 For deeper debugging, set `NOTHINGCLAW_WHATSAPP_VERBOSE=1` to see Baileys protocol logs.
 
