@@ -62,6 +62,26 @@ async function tryDownloadImage(msg: WAMessage): Promise<string | null> {
   }
 }
 
+async function tryDownloadDocument(msg: WAMessage): Promise<{ path: string; fileName: string } | null> {
+  const doc = msg.message?.documentMessage ?? msg.message?.documentWithCaptionMessage?.message?.documentMessage;
+  if (!doc) return null;
+  try {
+    const buffer = await downloadMediaMessage(msg, 'buffer', {});
+    mkdirSync(MEDIA_DIR, { recursive: true });
+    const id = (msg.key.id ?? `${Date.now()}`).replace(/[^a-zA-Z0-9-]/g, '_');
+    const original = (doc.fileName ?? '').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const mime = doc.mimetype ?? 'application/octet-stream';
+    const mimeExt = (mime.split('/').pop() ?? 'bin').split(';')[0];
+    const ext = original.includes('.') ? original.split('.').pop()! : mimeExt;
+    const filePath = resolve(MEDIA_DIR, `${id}.${ext}`);
+    writeFileSync(filePath, buffer as Buffer);
+    return { path: filePath, fileName: original || `document.${ext}` };
+  } catch (err) {
+    console.error('[whatsapp] document download failed:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 function extractText(m: WAMessageContent | null | undefined): string {
   if (!m) return '';
   return (
@@ -141,6 +161,7 @@ export async function createWhatsappChannel(opts: ChannelInit): Promise<Channel>
         const baseText = extractText(msg.message);
         const imagePath = await tryDownloadImage(msg);
         const audioPath = await tryDownloadAudio(msg);
+        const document = await tryDownloadDocument(msg);
 
         // Transcribe audio if voice support is enabled + whisper sidecar is up.
         let voiceText = '';
@@ -158,7 +179,7 @@ export async function createWhatsappChannel(opts: ChannelInit): Promise<Channel>
           console.log(`[whatsapp] received audio but NOTHINGCLAW_VOICE!=1; skipping transcription`);
         }
 
-        if (!baseText && !imagePath && !voiceText) {
+        if (!baseText && !imagePath && !voiceText && !document) {
           const kind = msg.message ? Object.keys(msg.message)[0] : 'empty';
           console.log(`[whatsapp] skipped non-text (${kind}) from ${msg.key.remoteJid}`);
           continue;
@@ -169,6 +190,7 @@ export async function createWhatsappChannel(opts: ChannelInit): Promise<Channel>
         if (baseText) parts.push(baseText);
         if (voiceText) parts.push(`[Voice]: ${voiceText}`);
         if (imagePath) parts.push(`[user attached an image: @${imagePath}]`);
+        if (document) parts.push(`[user attached a document "${document.fileName}": @${document.path}]`);
         const fullText = parts.join('\n\n');
 
         const threadId = `${PREFIX}${msg.key.remoteJid}`;

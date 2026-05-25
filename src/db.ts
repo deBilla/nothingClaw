@@ -38,6 +38,13 @@ export function initDb(): Database {
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
     CREATE INDEX IF NOT EXISTS outbox_pending_idx ON outbox(delivered_at, id);
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      thread_id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
   `);
 
   // Migration: add audio_path column for pre-Stage-2 databases that don't have it.
@@ -67,4 +74,22 @@ export function takePendingOutbox(db: Database, limit = 20): OutboxRow[] {
 
 export function markOutboxDelivered(db: Database, id: number): void {
   db.query('UPDATE outbox SET delivered_at = unixepoch() WHERE id = ?').run(id);
+}
+
+export function getThreadSession(db: Database, threadId: string, provider: string): string | null {
+  const row = db
+    .query('SELECT session_id FROM sessions WHERE thread_id = ? AND provider = ?')
+    .get(threadId, provider) as { session_id: string } | null;
+  return row?.session_id ?? null;
+}
+
+export function setThreadSession(db: Database, threadId: string, provider: string, sessionId: string): void {
+  db.query(
+    `INSERT INTO sessions (thread_id, provider, session_id, updated_at) VALUES (?, ?, ?, unixepoch())
+     ON CONFLICT(thread_id) DO UPDATE SET provider = excluded.provider, session_id = excluded.session_id, updated_at = unixepoch()`,
+  ).run(threadId, provider, sessionId);
+}
+
+export function clearThreadSession(db: Database, threadId: string): void {
+  db.query('DELETE FROM sessions WHERE thread_id = ?').run(threadId);
 }

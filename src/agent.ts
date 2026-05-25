@@ -3,11 +3,12 @@ import type { Database } from 'bun:sqlite';
 import { appendMessage, loadHistory, type HistoryRow } from './db.ts';
 import type { Channel } from './channels/types.ts';
 import { pickProvider } from './providers/registry.ts';
+import { runClaudeSdk } from './providers/claude-sdk.ts';
 
 const provider = pickProvider();
 const PROJECT_ROOT = process.cwd();
 const HISTORY_TURNS = 20;
-const AGENT_TIMEOUT_MS = Number(process.env.NOTHINGCLAW_AGENT_TIMEOUT_MS ?? 120_000);
+const AGENT_TIMEOUT_MS = Number(process.env.NOTHINGCLAW_AGENT_TIMEOUT_MS ?? 300_000);
 
 function buildPrompt(history: HistoryRow[], userText: string): string {
   const lines: string[] = [];
@@ -31,11 +32,20 @@ export async function handleMessage(
   threadId: string,
   userText: string,
 ): Promise<void> {
-  const history = loadHistory(db, threadId, HISTORY_TURNS);
   appendMessage(db, threadId, 'user', userText);
 
-  const prompt = buildPrompt(history, userText);
-  const response = await runProvider(prompt, threadId);
+  let response: string;
+  if (provider.name === 'claude') {
+    // SDK path: session resume keeps the transcript on disk; we only send the
+    // new user message. Sqlite history is still appended for /status etc.
+    response = await runClaudeSdk(db, threadId, userText, AGENT_TIMEOUT_MS);
+  } else {
+    // Gemini path: no session concept — pass recent history via the prompt.
+    const history = loadHistory(db, threadId, HISTORY_TURNS);
+    const prompt = buildPrompt(history, userText);
+    response = await runProvider(prompt, threadId);
+  }
+
   const reply = response.trim();
   if (!reply) {
     console.log(`[agent] ${threadId} produced empty reply — skipping send`);

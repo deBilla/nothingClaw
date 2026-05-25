@@ -22,6 +22,9 @@ switch (cmd) {
   case 'voice':
     await import('./voice.ts');
     break;
+  case 'google':
+    await import('./google.ts');
+    break;
   case 'help':
   case '--help':
   case '-h':
@@ -46,6 +49,7 @@ Commands:
   provider [gemini|claude]    Switch agent provider (interactive if no arg)
   whatsapp <sub>              WhatsApp ops (reset | status | clear-media)
   voice <sub>                 Voice (Whisper) ops (install | start | stop | status)
+  google <sub>                Google OAuth (login | status | logout | test)
   help                        Print this message
 `);
 }

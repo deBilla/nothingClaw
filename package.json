@@ -13,14 +13,17 @@
     "provider": "bun run src/cli/index.ts provider",
     "whatsapp": "bun run src/cli/index.ts whatsapp",
     "voice": "bun run src/cli/index.ts voice",
+    "google": "bun run src/cli/index.ts google",
     "dev": "bun run src/cli/index.ts start",
     "mcp": "bun run src/mcp/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.150",
     "@modelcontextprotocol/sdk": "^1.0.4",
     "@slack/bolt": "^3.22.0",
     "baileys": "7.0.0-rc13",
+    "googleapis": "^172.0.0",
     "node-telegram-bot-api": "^0.66.0",
     "pino": "^9.0.0",
     "qrcode-terminal": "^0.12.0"

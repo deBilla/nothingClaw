@@ -3,8 +3,35 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { sendTool } from './send.ts';
 import { speakTool } from './speak.ts';
+import { gmailRecentTool, gmailSearchTool, gmailGetTool } from './gmail.ts';
+import { calendarListTool, calendarCreateTool, calendarRawTool } from './calendar.ts';
+import { driveSearchTool, driveReadTool, driveRawTool } from './drive.ts';
+import { sheetsReadTool, sheetsWriteTool, sheetsRawTool } from './sheets.ts';
+import { docsReadTool, docsRawTool } from './docs.ts';
+import { slidesReadTool, slidesRawTool } from './slides.ts';
+import { googleAccountsTool } from './google_accounts.ts';
 
-const tools = [sendTool, speakTool];
+const tools = [
+  sendTool,
+  speakTool,
+  googleAccountsTool,
+  gmailRecentTool,
+  gmailSearchTool,
+  gmailGetTool,
+  calendarListTool,
+  calendarCreateTool,
+  calendarRawTool,
+  driveSearchTool,
+  driveReadTool,
+  driveRawTool,
+  sheetsReadTool,
+  sheetsWriteTool,
+  sheetsRawTool,
+  docsReadTool,
+  docsRawTool,
+  slidesReadTool,
+  slidesRawTool,
+];
 
 const server = new Server(
   { name: 'nothingclaw', version: '0.1.0' },
