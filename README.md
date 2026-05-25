@@ -112,7 +112,7 @@ That's the hardest 80% of building an agent, and full-time teams at Anthropic an
 - A tiny MCP server with channel-specific tools (`send_message`, `speak`)
 - Optional Python sidecars for Whisper + Kokoro
 
-**Compared to [NanoClaw](https://github.com/qwibitai/nanoclaw):** NanoClaw is dramatically larger because it solves a different problem — multi-tenant isolation, per-session Docker containers, credential vaulting, an entity model for users → groups → sessions. nothingClaw is single-user personal-scale; the simplicity matches the scope.
+**Compared to [NanoClaw](https://github.com/qwibitai/nanoclaw):** NanoClaw is dramatically larger because it solves a different problem — multi-tenant isolation, per-session Docker containers, credential vaulting, an entity model for users → groups → sessions. nothingClaw is single-user personal-scale; the simplicity matches the scope. For a full feature-by-feature breakdown, see [docs/vs-nanoclaw.md](docs/vs-nanoclaw.md).
 
 **Upside of being a thin wrapper:** when Anthropic or Google ship a new model, better tool use, or improved compaction, we get it for free — no code changes, just `npm i -g @anthropic-ai/claude-code@latest`.
 
