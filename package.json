@@ -9,7 +9,6 @@
   "scripts": {
     "setup": "bun run src/cli/index.ts setup",
     "start": "bun run src/cli/index.ts start",
-    "restart": "bun run src/cli/index.ts restart",
     "status": "bun run src/cli/index.ts status",
     "provider": "bun run src/cli/index.ts provider",
     "whatsapp": "bun run src/cli/index.ts whatsapp",

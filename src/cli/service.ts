@@ -1,8 +1,11 @@
-// Launchd service installer for nothingclaw.
+// Launchd service installer + controller for nothingclaw.
 //
 // Subcommands:
 //   install    — render plist with resolved paths, copy to LaunchAgents, bootstrap
 //   uninstall  — bootout + remove plist
+//   start      — load + run the (already-installed) service
+//   stop       — bootout (stops the process; KeepAlive won't respawn) — plist stays
+//   restart    — kickstart -k (SIGTERM; KeepAlive respawns into current code)
 //   status     — print loaded state + log paths + binary-exists check
 //   logs       — tail logs/nothingclaw.log
 //
@@ -31,6 +34,15 @@ function which(bin: string): string | null {
 function getUid(): string {
   const r = spawnSync('id', ['-u'], { encoding: 'utf-8' });
   return r.stdout.trim();
+}
+
+// Modern launchctl service target: gui/<uid>/<label>.
+function serviceTarget(): string {
+  return `gui/${getUid()}/${SERVICE_LABEL}`;
+}
+
+function isLoaded(): boolean {
+  return spawnSync('launchctl', ['print', serviceTarget()], { stdio: 'ignore' }).status === 0;
 }
 
 function renderPlist(): string {
@@ -117,6 +129,63 @@ function logs(): void {
   spawnSync('tail', ['-F', resolve(logFile)], { stdio: 'inherit' });
 }
 
+// Start the already-installed service. If it's loaded but idle, kickstart it;
+// if it isn't loaded yet, bootstrap from the installed plist.
+function start(): void {
+  if (isLoaded()) {
+    const r = spawnSync('launchctl', ['kickstart', serviceTarget()], { encoding: 'utf-8' });
+    if (r.status !== 0) {
+      log.error('launchctl kickstart failed', { stderr: r.stderr.trim() });
+      process.exit(1);
+    }
+    log.info('service started');
+    return;
+  }
+  if (!existsSync(INSTALLED_PLIST)) {
+    log.fatal('service not installed', { hint: 'run: bun run service install' });
+    process.exit(1);
+  }
+  const r = spawnSync('launchctl', ['bootstrap', `gui/${getUid()}`, INSTALLED_PLIST], {
+    encoding: 'utf-8',
+  });
+  if (r.status !== 0) {
+    log.error('launchctl bootstrap failed', { stderr: r.stderr.trim() });
+    process.exit(1);
+  }
+  log.info('service started');
+}
+
+// Stop the running service. bootout unloads it so KeepAlive can't respawn; the
+// plist stays on disk so `service start` can bring it back. (Use `uninstall` to
+// also remove the plist and disable autostart at login.)
+function stop(): void {
+  if (!isLoaded()) {
+    log.warn('service not running', { label: SERVICE_LABEL });
+    return;
+  }
+  const r = spawnSync('launchctl', ['bootout', serviceTarget()], { encoding: 'utf-8' });
+  if (r.status !== 0) {
+    log.error('launchctl bootout failed', { stderr: r.stderr.trim() });
+    process.exit(1);
+  }
+  log.info('service stopped', { hint: 'start again: bun run service start' });
+}
+
+// Restart in place via `launchctl kickstart -k`: SIGTERM the current process,
+// KeepAlive respawns it. Same primitive `update` uses after a pull.
+function restart(): void {
+  if (!isLoaded()) {
+    log.fatal('service not loaded — run `bun run service install` first, or restart the foreground process by hand.');
+    process.exit(1);
+  }
+  const r = spawnSync('launchctl', ['kickstart', '-k', serviceTarget()], { encoding: 'utf-8' });
+  if (r.status !== 0) {
+    log.error('launchctl kickstart failed', { stderr: r.stderr.trim() });
+    process.exit(1);
+  }
+  log.info('service restarted', { hint: 'tail logs/nothingclaw.log to verify' });
+}
+
 const sub = process.argv[3] ?? 'status';
 
 switch (sub) {
@@ -126,6 +195,15 @@ switch (sub) {
   case 'uninstall':
     uninstall();
     break;
+  case 'start':
+    start();
+    break;
+  case 'stop':
+    stop();
+    break;
+  case 'restart':
+    restart();
+    break;
   case 'status':
     status();
     break;
@@ -133,6 +211,9 @@ switch (sub) {
     logs();
     break;
   default:
-    log.fatal('unknown service subcommand', { sub, valid: ['install', 'uninstall', 'status', 'logs'] });
+    log.fatal('unknown service subcommand', {
+      sub,
+      valid: ['install', 'uninstall', 'start', 'stop', 'restart', 'status', 'logs'],
+    });
     process.exit(1);
 }
