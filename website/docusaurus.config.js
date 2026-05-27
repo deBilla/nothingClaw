@@ -12,7 +12,6 @@ const config = {
 
   organizationName: 'deBilla',
   projectName: 'marsclaw',
-  deploymentBranch: 'gh-pages',
   trailingSlash: false,
 
   onBrokenLinks: 'warn',
