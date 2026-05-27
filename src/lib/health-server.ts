@@ -12,7 +12,7 @@
 //     heartbeat_age_ms: 532,
 //     channels: ["whatsapp"],
 //     outbox: { pending: 0, failed: 0 },
-//     db: { path: "data/nothingclaw.db", size_kb: 80, messages: 144, threads: 5 },
+//     db: { path: "data/marsclaw.db", size_kb: 80, messages: 144, threads: 5 },
 //     today_spend_usd: 0.0123,
 //     daily_budget_usd: 5,
 //   }
@@ -29,8 +29,8 @@ import { log } from './log.ts';
 import { loadConfig } from './config.ts';
 import { todaySpendUsd } from './cost-tracker.ts';
 
-const HEARTBEAT_PATH = process.env.NOTHINGCLAW_HEARTBEAT ?? 'data/heartbeat';
-const WHATSAPP_REAUTH_MARKER = process.env.NOTHINGCLAW_WHATSAPP_REAUTH_MARKER ?? 'data/whatsapp-needs-reauth';
+const HEARTBEAT_PATH = process.env.MARSCLAW_HEARTBEAT ?? 'data/heartbeat';
+const WHATSAPP_REAUTH_MARKER = process.env.MARSCLAW_WHATSAPP_REAUTH_MARKER ?? 'data/whatsapp-needs-reauth';
 
 export interface HealthOpts {
   db: Database;
@@ -81,10 +81,10 @@ function outboxStats(db: Database): { pending: number; failed: number } {
 const STARTED_AT = Date.now();
 
 export function startHealthServer(opts: HealthOpts): Server | null {
-  const portEnv = process.env.NOTHINGCLAW_HEALTH_PORT;
+  const portEnv = process.env.MARSCLAW_HEALTH_PORT;
   const port = opts.port ?? (portEnv ? Number.parseInt(portEnv, 10) : 0);
   if (port === 0) {
-    log.info('health endpoint disabled (set NOTHINGCLAW_HEALTH_PORT to enable)');
+    log.info('health endpoint disabled (set MARSCLAW_HEALTH_PORT to enable)');
     return null;
   }
 

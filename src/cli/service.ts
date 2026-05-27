@@ -1,4 +1,4 @@
-// Launchd service installer + controller for nothingclaw.
+// Launchd service installer + controller for marsclaw.
 //
 // Subcommands:
 //   install    — render plist with resolved paths, copy to LaunchAgents, bootstrap
@@ -7,7 +7,7 @@
 //   stop       — bootout (stops the process; KeepAlive won't respawn) — plist stays
 //   restart    — kickstart -k (SIGTERM; KeepAlive respawns into current code)
 //   status     — print loaded state + log paths + binary-exists check
-//   logs       — tail logs/nothingclaw.log
+//   logs       — tail logs/marsclaw.log
 //
 // The launchctl primitives (start/stop/restart/isLoaded) live in ../lib/launchd.ts
 // so the setup flow can reuse them. We use `launchctl bootstrap / bootout`
@@ -31,7 +31,7 @@ import {
   restartService,
 } from '../lib/launchd.ts';
 
-const PLIST_TEMPLATE = 'launchd/com.nothingclaw.plist';
+const PLIST_TEMPLATE = 'launchd/com.marsclaw.plist';
 const PROJECT_ROOT = process.cwd();
 const HOME = homedir();
 
@@ -70,8 +70,8 @@ function install(): void {
     process.exit(1);
   }
   log.info('service installed and running');
-  log.info('logs:   tail -F logs/nothingclaw.log');
-  log.info('errors: tail -F logs/nothingclaw.error.log');
+  log.info('logs:   tail -F logs/marsclaw.log');
+  log.info('errors: tail -F logs/marsclaw.error.log');
 }
 
 function uninstall(): void {
@@ -113,7 +113,7 @@ function status(): void {
 }
 
 function logs(): void {
-  const logFile = join(PROJECT_ROOT, 'logs', 'nothingclaw.log');
+  const logFile = join(PROJECT_ROOT, 'logs', 'marsclaw.log');
   if (!existsSync(logFile)) {
     log.warn('no log file yet', { path: logFile });
     return;
@@ -154,7 +154,7 @@ function restart(): void {
     log.error('launchctl kickstart failed', { reason: r.reason });
     process.exit(1);
   }
-  log.info('service restarted', { hint: 'tail logs/nothingclaw.log to verify' });
+  log.info('service restarted', { hint: 'tail logs/marsclaw.log to verify' });
 }
 
 const sub = process.argv[3] ?? 'status';

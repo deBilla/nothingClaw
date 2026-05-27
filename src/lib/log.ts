@@ -4,7 +4,7 @@
 // LOG_LEVEL env var: debug | info | warn | error | fatal (default 'info').
 // `err` key is special-cased to include constructor name + stack.
 //
-// File logging: when NOTHINGCLAW_LOG_FILE is set, lines are also tee'd to
+// File logging: when MARSCLAW_LOG_FILE is set, lines are also tee'd to
 // that file. The file is rotated in-process by lib/log-rotate.ts so launchd
 // doesn't need to know about it.
 //
@@ -34,9 +34,9 @@ const FULL_RESET = '\x1b[0m';
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 const threshold = LEVELS[(process.env.LOG_LEVEL as Level) || 'info'] ?? LEVELS.info;
-const LOG_FILE = process.env.NOTHINGCLAW_LOG_FILE;
-const CRASH_DIR = process.env.NOTHINGCLAW_CRASH_DIR ?? 'crashes';
-const RING_SIZE = Number(process.env.NOTHINGCLAW_LOG_RING_SIZE ?? 200);
+const LOG_FILE = process.env.MARSCLAW_LOG_FILE;
+const CRASH_DIR = process.env.MARSCLAW_CRASH_DIR ?? 'crashes';
+const RING_SIZE = Number(process.env.MARSCLAW_LOG_RING_SIZE ?? 200);
 
 if (LOG_FILE) {
   startFileLogging(LOG_FILE);
@@ -102,7 +102,7 @@ function dumpCrash(reason: string, err: unknown): string | null {
     mkdirSync(CRASH_DIR, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const path = join(CRASH_DIR, `crash-${stamp}.txt`);
-    const header = `# nothingclaw crash dump\n# reason: ${reason}\n# at: ${new Date().toISOString()}\n# pid: ${process.pid}\n\n## Error\n\n${formatErr(err)}\n\n## Last ${ring.length} log lines\n\n`;
+    const header = `# marsclaw crash dump\n# reason: ${reason}\n# at: ${new Date().toISOString()}\n# pid: ${process.pid}\n\n## Error\n\n${formatErr(err)}\n\n## Last ${ring.length} log lines\n\n`;
     writeFileSync(path, header + ring.join(''));
     return path;
   } catch (writeErr) {

@@ -3,9 +3,9 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildCanUseTool } from '../src/lib/tool-permissions.ts';
-import type { NothingclawConfig } from '../src/lib/config.ts';
+import type { MarsclawConfig } from '../src/lib/config.ts';
 
-function configWith(overrides: Partial<NothingclawConfig>): NothingclawConfig {
+function configWith(overrides: Partial<MarsclawConfig>): MarsclawConfig {
   return {
     bot_name: 'Mars',
     allowed_jids: [],
@@ -104,13 +104,13 @@ describe('canUseTool', () => {
 
   it('always allows mcp__ tools (no path / command checks)', async () => {
     const fn = buildCanUseTool(configWith({}));
-    expect((await call(fn, 'mcp__nothingclaw__speak', { text: 'hi' })).behavior).toBe('allow');
-    expect((await call(fn, 'mcp__nothingclaw__send_message', { text: 'hi' })).behavior).toBe('allow');
-    expect((await call(fn, 'mcp__nothingclaw__gmail_recent', { count: 5 })).behavior).toBe('allow');
+    expect((await call(fn, 'mcp__marsclaw__speak', { text: 'hi' })).behavior).toBe('allow');
+    expect((await call(fn, 'mcp__marsclaw__send_message', { text: 'hi' })).behavior).toBe('allow');
+    expect((await call(fn, 'mcp__marsclaw__gmail_recent', { count: 5 })).behavior).toBe('allow');
   });
 
   describe('auto-mkdir for Write tools', () => {
-    const SANDBOX = join(tmpdir(), `nothingclaw-permtest-${process.pid}`);
+    const SANDBOX = join(tmpdir(), `marsclaw-permtest-${process.pid}`);
     beforeEach(() => {
       if (existsSync(SANDBOX)) rmSync(SANDBOX, { recursive: true });
       mkdirSync(SANDBOX, { recursive: true });
@@ -137,7 +137,7 @@ describe('canUseTool', () => {
 
     it('does not mkdir when path is denied', async () => {
       const fn = buildCanUseTool(configWith({ allowed_paths: [SANDBOX] }));
-      const outside = join(tmpdir(), `nothingclaw-permtest-OUTSIDE-${process.pid}`);
+      const outside = join(tmpdir(), `marsclaw-permtest-OUTSIDE-${process.pid}`);
       const r = await call(fn, 'Write', { file_path: join(outside, 'x.md') });
       expect(r.behavior).toBe('deny');
       expect(existsSync(outside)).toBe(false);
@@ -145,15 +145,15 @@ describe('canUseTool', () => {
   });
 
   it('bypass env restores unrestricted access', async () => {
-    const before = process.env.NOTHINGCLAW_TOOL_PERMISSIONS;
-    process.env.NOTHINGCLAW_TOOL_PERMISSIONS = 'bypass';
+    const before = process.env.MARSCLAW_TOOL_PERMISSIONS;
+    process.env.MARSCLAW_TOOL_PERMISSIONS = 'bypass';
     try {
       const fn = buildCanUseTool(configWith({}));
       expect((await call(fn, 'Read', { file_path: '/etc/passwd' })).behavior).toBe('allow');
       expect((await call(fn, 'Bash', { command: 'rm -rf /' })).behavior).toBe('allow');
     } finally {
-      if (before === undefined) delete process.env.NOTHINGCLAW_TOOL_PERMISSIONS;
-      else process.env.NOTHINGCLAW_TOOL_PERMISSIONS = before;
+      if (before === undefined) delete process.env.MARSCLAW_TOOL_PERMISSIONS;
+      else process.env.MARSCLAW_TOOL_PERMISSIONS = before;
     }
   });
 });

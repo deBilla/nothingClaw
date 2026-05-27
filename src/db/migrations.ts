@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import type { Database } from 'bun:sqlite';
 import { log } from '../lib/log.ts';
 
-const MIGRATIONS_DIR = process.env.NOTHINGCLAW_MIGRATIONS_DIR ?? 'migrations';
+const MIGRATIONS_DIR = process.env.MARSCLAW_MIGRATIONS_DIR ?? 'migrations';
 const BOOTSTRAP_STAMP_AT = 2; // schemas predating this system match 0001 + 0002
 
 function ensureSchemaTable(db: Database): void {

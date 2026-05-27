@@ -29,14 +29,14 @@ import { interruptThread } from '../providers/claude-sdk.ts';
 const STOP_RE = /^\s*(stop|abort|cancel|wait\s+stop|nvm|nevermind|never\s+mind)\s*[!.\s]*$/i;
 
 const PREFIX = 'whatsapp:';
-const AUTH_DIR = process.env.NOTHINGCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
-const MEDIA_DIR = process.env.NOTHINGCLAW_WHATSAPP_MEDIA ?? 'data/whatsapp-media';
-const VERBOSE = process.env.NOTHINGCLAW_WHATSAPP_VERBOSE === '1';
+const AUTH_DIR = process.env.MARSCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
+const MEDIA_DIR = process.env.MARSCLAW_WHATSAPP_MEDIA ?? 'data/whatsapp-media';
+const VERBOSE = process.env.MARSCLAW_WHATSAPP_VERBOSE === '1';
 // Marker file written when the session is logged out and the user must
 // re-scan the QR. Cleared on successful reconnect. External monitors
 // (the health endpoint, a phone widget, a cron-driven email script) can
 // watch this file to alert the operator.
-const REAUTH_MARKER = process.env.NOTHINGCLAW_WHATSAPP_REAUTH_MARKER ?? 'data/whatsapp-needs-reauth';
+const REAUTH_MARKER = process.env.MARSCLAW_WHATSAPP_REAUTH_MARKER ?? 'data/whatsapp-needs-reauth';
 
 // pino is used ONLY to silence Baileys' chatty internal logger. Our own
 // logging goes through src/lib/log.ts.

@@ -3,7 +3,7 @@
 // Precedence (lowest → highest):
 //   1. defaults (this file)
 //   2. data/config.json (non-secret runtime config)
-//   3. process.env via the NOTHINGCLAW_* convention
+//   3. process.env via the MARSCLAW_* convention
 //
 // Env wins because existing users have `.env` muscle-memory and the upgrade
 // must not silently change behaviour. Secrets (API tokens) stay in .env;
@@ -13,9 +13,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { writeAtomic } from './atomic.ts';
 import { log } from './log.ts';
 
-export const CONFIG_PATH = process.env.NOTHINGCLAW_CONFIG ?? 'data/config.json';
+export const CONFIG_PATH = process.env.MARSCLAW_CONFIG ?? 'data/config.json';
 
-export interface NothingclawConfig {
+export interface MarsclawConfig {
   bot_name: string;
   // What the assistant calls its human (the operator). Injected into the
   // chat persona and seeded into MEMORY.md at setup.
@@ -56,7 +56,7 @@ export interface NothingclawConfig {
   daily_usd_budget: number;
 }
 
-function defaults(): NothingclawConfig {
+function defaults(): MarsclawConfig {
   return {
     bot_name: 'Mars',
     owner_name: '',
@@ -102,9 +102,9 @@ function parseInt10(raw: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-let cached: NothingclawConfig | null = null;
+let cached: MarsclawConfig | null = null;
 
-export function loadConfig(): NothingclawConfig {
+export function loadConfig(): MarsclawConfig {
   if (cached) return cached;
 
   const cfg = defaults();
@@ -113,7 +113,7 @@ export function loadConfig(): NothingclawConfig {
   if (existsSync(CONFIG_PATH)) {
     try {
       const raw = readFileSync(CONFIG_PATH, 'utf-8');
-      const parsed = JSON.parse(raw) as Partial<NothingclawConfig>;
+      const parsed = JSON.parse(raw) as Partial<MarsclawConfig>;
       Object.assign(cfg, parsed);
     } catch (err) {
       log.warn('Failed to parse config.json — using defaults', { err, path: CONFIG_PATH });
@@ -121,47 +121,47 @@ export function loadConfig(): NothingclawConfig {
   }
 
   // Env overrides (highest precedence).
-  const envBotName = process.env.NOTHINGCLAW_BOT_NAME;
+  const envBotName = process.env.MARSCLAW_BOT_NAME;
   if (envBotName) cfg.bot_name = envBotName;
 
-  const envOwnerName = process.env.NOTHINGCLAW_OWNER_NAME;
+  const envOwnerName = process.env.MARSCLAW_OWNER_NAME;
   if (envOwnerName) cfg.owner_name = envOwnerName;
 
-  const envOwnerPhone = process.env.NOTHINGCLAW_OWNER_PHONE;
+  const envOwnerPhone = process.env.MARSCLAW_OWNER_PHONE;
   if (envOwnerPhone) cfg.owner_phone = envOwnerPhone.replace(/\D/g, '');
 
-  const envJids = parseList(process.env.NOTHINGCLAW_WHATSAPP_ALLOWED_JIDS);
+  const envJids = parseList(process.env.MARSCLAW_WHATSAPP_ALLOWED_JIDS);
   if (envJids !== undefined) cfg.allowed_jids = envJids;
 
-  const envPaths = parseList(process.env.NOTHINGCLAW_ALLOWED_PATHS);
+  const envPaths = parseList(process.env.MARSCLAW_ALLOWED_PATHS);
   if (envPaths !== undefined) cfg.allowed_paths = envPaths;
 
-  const envMax = parseInt10(process.env.NOTHINGCLAW_MAX_SESSIONS);
+  const envMax = parseInt10(process.env.MARSCLAW_MAX_SESSIONS);
   if (envMax !== undefined) cfg.max_sessions = envMax;
 
-  const envIdle = parseInt10(process.env.NOTHINGCLAW_CLAUDE_IDLE_MS);
+  const envIdle = parseInt10(process.env.MARSCLAW_CLAUDE_IDLE_MS);
   if (envIdle !== undefined) cfg.idle_ms = envIdle;
 
-  const envMaxAge = parseInt10(process.env.NOTHINGCLAW_CLAUDE_MAX_SESSION_AGE_MS);
+  const envMaxAge = parseInt10(process.env.MARSCLAW_CLAUDE_MAX_SESSION_AGE_MS);
   if (envMaxAge !== undefined) cfg.max_session_age_ms = envMaxAge;
 
-  const envTz = process.env.NOTHINGCLAW_TIMEZONE;
+  const envTz = process.env.MARSCLAW_TIMEZONE;
   if (envTz) cfg.timezone = envTz;
 
-  const envLocation = process.env.NOTHINGCLAW_LOCATION;
+  const envLocation = process.env.MARSCLAW_LOCATION;
   if (envLocation) cfg.location = envLocation;
 
-  const envVoice = parseBool(process.env.NOTHINGCLAW_VOICE);
+  const envVoice = parseBool(process.env.MARSCLAW_VOICE);
   if (envVoice !== undefined) cfg.voice_enabled = envVoice;
 
   const envProvider = process.env.AGENT_PROVIDER;
   if (envProvider === 'claude' || envProvider === 'gemini') cfg.agent_provider = envProvider;
 
-  const envRateMin = parseInt10(process.env.NOTHINGCLAW_RATE_LIMIT_PER_MINUTE);
+  const envRateMin = parseInt10(process.env.MARSCLAW_RATE_LIMIT_PER_MINUTE);
   if (envRateMin !== undefined) cfg.rate_limit_per_minute = envRateMin;
-  const envRateHr = parseInt10(process.env.NOTHINGCLAW_RATE_LIMIT_PER_HOUR);
+  const envRateHr = parseInt10(process.env.MARSCLAW_RATE_LIMIT_PER_HOUR);
   if (envRateHr !== undefined) cfg.rate_limit_per_hour = envRateHr;
-  const envBudget = process.env.NOTHINGCLAW_DAILY_USD_BUDGET;
+  const envBudget = process.env.MARSCLAW_DAILY_USD_BUDGET;
   if (envBudget) {
     const n = Number.parseFloat(envBudget);
     if (Number.isFinite(n) && n >= 0) cfg.daily_usd_budget = n;
@@ -176,11 +176,11 @@ export function _resetConfigCacheForTests(): void {
   cached = null;
 }
 
-export function writeConfig(partial: Partial<NothingclawConfig>): NothingclawConfig {
-  let current: Partial<NothingclawConfig> = {};
+export function writeConfig(partial: Partial<MarsclawConfig>): MarsclawConfig {
+  let current: Partial<MarsclawConfig> = {};
   if (existsSync(CONFIG_PATH)) {
     try {
-      current = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Partial<NothingclawConfig>;
+      current = JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as Partial<MarsclawConfig>;
     } catch (err) {
       log.warn('Overwriting unparseable config.json', { err, path: CONFIG_PATH });
     }

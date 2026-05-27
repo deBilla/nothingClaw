@@ -6,7 +6,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { runMigrations } from './migrations.ts';
 
-export const DB_PATH = process.env.NOTHINGCLAW_DB ?? 'data/nothingclaw.db';
+export const DB_PATH = process.env.MARSCLAW_DB ?? 'data/marsclaw.db';
 
 export function initDb(): Database {
   mkdirSync(dirname(DB_PATH), { recursive: true });

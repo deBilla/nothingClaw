@@ -1,6 +1,6 @@
 // MCP tools: read-only Gmail access. Auth comes from macOS Keychain via
 // src/google/auth.ts — set up once with `bun run google login [alias]`.
-// Every tool accepts an optional `account` (alias from `nothingclaw google list`).
+// Every tool accepts an optional `account` (alias from `marsclaw google list`).
 
 import { listRecent, search, getMessage, sendMessage, type MessageMeta } from '../google/gmail.ts';
 

@@ -15,7 +15,7 @@ import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { writeAtomic } from './atomic.ts';
 import { log } from './log.ts';
 
-const CB_PATH = process.env.NOTHINGCLAW_CIRCUIT_BREAKER ?? 'data/circuit-breaker.json';
+const CB_PATH = process.env.MARSCLAW_CIRCUIT_BREAKER ?? 'data/circuit-breaker.json';
 const RESET_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 // Index = number of consecutive crashes (0 = clean start, attempt 1).
 // 6+ crashes capped at 15min.

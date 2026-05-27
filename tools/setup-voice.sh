@@ -15,7 +15,7 @@ ok()   { printf "\033[32m✓\033[0m %s\n" "$1"; }
 warn() { printf "\033[33m!\033[0m %s\n" "$1"; }
 err()  { printf "\033[31m✗\033[0m %s\n" "$1" >&2; }
 
-bold "nothingClaw voice — Whisper installer"
+bold "marsClaw voice — Whisper installer"
 echo
 
 OS="$(uname -s)"
@@ -163,4 +163,4 @@ echo "  Check status:         bun run voice status"
 echo "  Tail Whisper logs:    tail -f data/voice-whisper.log"
 echo "  Tail Kokoro logs:     tail -f data/voice-kokoro.log"
 echo
-echo "Voice support is OFF in nothingclaw until you set NOTHINGCLAW_VOICE=1 in .env."
+echo "Voice support is OFF in marsclaw until you set MARSCLAW_VOICE=1 in .env."

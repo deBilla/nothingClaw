@@ -1,10 +1,10 @@
 {
-  "name": "nothingclaw",
+  "name": "marsclaw",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "nothingclaw": "./src/cli/index.ts"
+    "marsclaw": "./src/cli/index.ts"
   },
   "scripts": {
     "setup": "bun run src/cli/index.ts setup",

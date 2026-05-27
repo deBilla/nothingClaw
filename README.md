@@ -1,11 +1,11 @@
-# nothingClaw
+# marsClaw
 
 A personal chat agent — nothing more.
 
-nothingClaw is a single-process Bun app that connects messaging channels (Telegram, Slack, WhatsApp) to an agent CLI (Gemini CLI or Claude Code). Messages route through SQLite; the chosen agent CLI handles the LLM call, tools, and reasoning loop.
+marsClaw is a single-process Bun app that connects messaging channels (Telegram, Slack, WhatsApp) to an agent CLI (Gemini CLI or Claude Code). Messages route through SQLite; the chosen agent CLI handles the LLM call, tools, and reasoning loop.
 
 ```
-  ╲ ╲ ╲    nothingClaw  ·  running
+  ╲ ╲ ╲    marsClaw  ·  running
    ╲ ╲ ╲   provider: gemini  ·  channels: telegram, whatsapp
 ```
 
@@ -29,8 +29,8 @@ nothingClaw is a single-process Bun app that connects messaging channels (Telegr
 ## Quick start
 
 ```bash
-git clone <your-fork-url> nothingclaw
-cd nothingclaw
+git clone <your-fork-url> marsclaw
+cd marsclaw
 bash setup.sh
 ```
 
@@ -84,7 +84,7 @@ bun run voice stop                  # stop both sidecars
         └─── router.send ◀── outbox drain ◀─────┘
 ```
 
-Single process. SQLite (`data/nothingclaw.db`) is the only state:
+Single process. SQLite (`data/marsclaw.db`) is the only state:
 
 - `messages` — conversation history per thread
 - `outbox` — async messages queued by the agent's `send_message` / `speak` MCP tools (text and audio share one queue via an `audio_path` column)
@@ -93,7 +93,7 @@ The agent CLI runs as a subprocess per incoming message. Its built-in tools (she
 
 ## Why this is small
 
-The whole codebase is ~1500 lines of TypeScript. nothingClaw is deliberately the laziest possible implementation of a personal chat agent — and that's a feature, not a shortcut.
+The whole codebase is ~1500 lines of TypeScript. marsClaw is deliberately the laziest possible implementation of a personal chat agent — and that's a feature, not a shortcut.
 
 **What we delegate to the agent CLI** (Claude Code or Gemini CLI):
 
@@ -113,7 +113,7 @@ That's the hardest 80% of building an agent, and full-time teams at Anthropic an
 - A tiny MCP server with channel-specific tools (`send_message`, `speak`)
 - Optional Python sidecars for Whisper + Kokoro
 
-**Compared to [NanoClaw](https://github.com/qwibitai/nanoclaw):** NanoClaw is dramatically larger because it solves a different problem — multi-tenant isolation, per-session Docker containers, credential vaulting, an entity model for users → groups → sessions. nothingClaw is single-user personal-scale; the simplicity matches the scope. For a full feature-by-feature breakdown, see [docs/vs-nanoclaw.md](docs/vs-nanoclaw.md).
+**Compared to [NanoClaw](https://github.com/qwibitai/nanoclaw):** NanoClaw is dramatically larger because it solves a different problem — multi-tenant isolation, per-session Docker containers, credential vaulting, an entity model for users → groups → sessions. marsClaw is single-user personal-scale; the simplicity matches the scope. For a full feature-by-feature breakdown, see [docs/vs-nanoclaw.md](docs/vs-nanoclaw.md).
 
 **Upside of being a thin wrapper:** when Anthropic or Google ship a new model, better tool use, or improved compaction, we get it for free — no code changes, just `npm i -g @anthropic-ai/claude-code@latest`.
 
@@ -141,7 +141,7 @@ Setup will offer to do all of this automatically if you say `y` to *"Enable voic
 ```bash
 bun run voice start          # starts both sidecars (detached, PIDs in data/voice-*.pid)
 bun run voice status         # whisper: ok · kokoro: ok
-echo 'NOTHINGCLAW_VOICE=1' >> .env
+echo 'MARSCLAW_VOICE=1' >> .env
 bun run start                # restart the bot
 ```
 
@@ -178,18 +178,18 @@ Whisper defaults to `base` (~150MB, good for English + accents). Override with `
 | `TELEGRAM_BOT_TOKEN` | per-channel | From [@BotFather](https://t.me/BotFather) |
 | `SLACK_BOT_TOKEN` | per-channel | `xoxb-…` |
 | `SLACK_APP_TOKEN` | per-channel | `xapp-…` (needs `connections:write`) |
-| `NOTHINGCLAW_WHATSAPP` | per-channel | Set to `1`; auth via QR (scanned during setup, or on first start) |
-| `NOTHINGCLAW_VOICE` | per-feature | Set to `1` to enable Whisper STT + Kokoro TTS (sidecars must be running) |
+| `MARSCLAW_WHATSAPP` | per-channel | Set to `1`; auth via QR (scanned during setup, or on first start) |
+| `MARSCLAW_VOICE` | per-feature | Set to `1` to enable Whisper STT + Kokoro TTS (sidecars must be running) |
 | `WHISPER_URL` | optional | Whisper sidecar URL (default `http://127.0.0.1:9000`) |
 | `WHISPER_MODEL` | optional | `tiny` / `base` / `small` / `medium` / `large` (default `base`) |
 | `KOKORO_URL` | optional | Kokoro sidecar URL (default `http://127.0.0.1:9001`) |
 | `KOKORO_VOICE` | optional | Default voice (`af_heart`, `af_bella`, `am_adam`, …) |
 | `KOKORO_FORMAT` | optional | `ogg` (proper voice note) / `mp3` / `wav` |
 | `GEMINI_API_KEY` | optional | Use a paid key instead of OAuth (higher quota) |
-| `NOTHINGCLAW_TIMEZONE` | optional | IANA tz (e.g. `Asia/Colombo`) — the agent's "now". Prompted at setup; default `UTC` |
-| `NOTHINGCLAW_LOCATION` | optional | Free-text location for personalization (e.g. `Colombo, Sri Lanka`) |
-| `NOTHINGCLAW_AGENT_TIMEOUT_MS` | optional | Per-message timeout (default `120000`) |
-| `NOTHINGCLAW_WHATSAPP_VERBOSE` | optional | Set to `1` to dump Baileys protocol logs |
+| `MARSCLAW_TIMEZONE` | optional | IANA tz (e.g. `Asia/Colombo`) — the agent's "now". Prompted at setup; default `UTC` |
+| `MARSCLAW_LOCATION` | optional | Free-text location for personalization (e.g. `Colombo, Sri Lanka`) |
+| `MARSCLAW_AGENT_TIMEOUT_MS` | optional | Per-message timeout (default `120000`) |
+| `MARSCLAW_WHATSAPP_VERBOSE` | optional | Set to `1` to dump Baileys protocol logs |
 
 ## Memory and skills
 
@@ -221,14 +221,14 @@ The agent CLI's own credentials live in your home directory (`~/.gemini/`, `~/.c
 |---|---|---|
 | WhatsApp keeps cycling (`code=405/428`) | Outdated Baileys protocol | `bun update baileys` |
 | Connected but no replies | Replaying history (`type: append`) — only `notify` is processed | Wait a few seconds, then send a fresh message |
-| `[gemini] timeout after 120000ms` | Slow tool loop or quota retries | Bump `NOTHINGCLAW_AGENT_TIMEOUT_MS` or switch provider |
-| `[whatsapp] skipped non-text (audioMessage)` | Voice support disabled | `bun run voice start` and set `NOTHINGCLAW_VOICE=1` |
+| `[gemini] timeout after 120000ms` | Slow tool loop or quota retries | Bump `MARSCLAW_AGENT_TIMEOUT_MS` or switch provider |
+| `[whatsapp] skipped non-text (audioMessage)` | Voice support disabled | `bun run voice start` and set `MARSCLAW_VOICE=1` |
 | `[whatsapp] transcribe failed` | Whisper sidecar down or unhealthy | `bun run voice status`; restart with `bun run voice restart` |
 | `Speech synthesis failed: … kokoro sidecar` | Kokoro sidecar not running | `bun run voice start` |
 | `[whatsapp] giving up after 5 failed connection attempts` | Too many linked devices, or geo block | Unlink from phone, or try a different network |
 | Same reply sent 2-3 times | Was a drain-race bug — fixed in `src/index.ts` | Pull latest; restart |
 
-For deeper debugging, set `NOTHINGCLAW_WHATSAPP_VERBOSE=1` to see Baileys protocol logs.
+For deeper debugging, set `MARSCLAW_WHATSAPP_VERBOSE=1` to see Baileys protocol logs.
 
 ## License
 

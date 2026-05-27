@@ -5,7 +5,7 @@
 
 import { writeAtomic } from './atomic.ts';
 
-const HEARTBEAT_PATH = process.env.NOTHINGCLAW_HEARTBEAT ?? 'data/heartbeat';
+const HEARTBEAT_PATH = process.env.MARSCLAW_HEARTBEAT ?? 'data/heartbeat';
 
 export function touchHeartbeat(): void {
   // Write a string (not just timestamp the file) so the contents are also

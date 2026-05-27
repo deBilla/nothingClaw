@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 
-const SERVICE = 'nothingclaw';
+const SERVICE = 'marsclaw';
 const FALLBACK_DIR = 'data/secrets';
 const isMac = process.platform === 'darwin';
 

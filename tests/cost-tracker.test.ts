@@ -3,9 +3,9 @@ import { existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const USAGE_DIR = join(tmpdir(), `nothingclaw-usage-${process.pid}`);
+const USAGE_DIR = join(tmpdir(), `marsclaw-usage-${process.pid}`);
 const USAGE_PATH = join(USAGE_DIR, 'usage.jsonl');
-process.env.NOTHINGCLAW_USAGE = USAGE_PATH;
+process.env.MARSCLAW_USAGE = USAGE_PATH;
 
 const { recordUsage, todaySpendUsd, isOverBudget } = await import('../src/lib/cost-tracker.ts');
 

@@ -81,7 +81,7 @@ export function resolveAccount(alias?: string): string {
     if (!idx.accounts.includes(alias)) {
       throw new Error(
         `Unknown Google account "${alias}". Known: ${idx.accounts.join(', ') || '(none)'}. ` +
-          `Add one with: nothingclaw google login ${alias}`,
+          `Add one with: marsclaw google login ${alias}`,
       );
     }
     return alias;
@@ -89,11 +89,11 @@ export function resolveAccount(alias?: string): string {
   if (idx.default) return idx.default;
   if (idx.accounts.length === 1) return idx.accounts[0]!;
   if (idx.accounts.length === 0) {
-    throw new Error('No Google accounts connected. Run: nothingclaw google login');
+    throw new Error('No Google accounts connected. Run: marsclaw google login');
   }
   throw new Error(
     `Multiple accounts configured (${idx.accounts.join(', ')}) but no default set. ` +
-      `Pick one with: nothingclaw google use <alias>`,
+      `Pick one with: marsclaw google use <alias>`,
   );
 }
 
@@ -146,7 +146,7 @@ export async function loginInteractive(scopes: string[], alias = 'default'): Pro
     console.log(`  or revoke at https://myaccount.google.com/permissions and retry.`);
   }
   if (idx.default !== alias) {
-    console.log(`  (default account is still "${idx.default}"; switch with: nothingclaw google use ${alias})`);
+    console.log(`  (default account is still "${idx.default}"; switch with: marsclaw google use ${alias})`);
   }
 }
 
@@ -155,7 +155,7 @@ export function getAuthedClient(alias?: string): OAuth2Client {
   const account = resolveAccount(alias);
   const refreshToken = getSecret(`${TOKEN_PREFIX}:${account}`);
   if (!refreshToken) {
-    throw new Error(`No stored credentials for account "${account}". Run: nothingclaw google login ${account}`);
+    throw new Error(`No stored credentials for account "${account}". Run: marsclaw google login ${account}`);
   }
   const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
   oauth2.setCredentials({ refresh_token: refreshToken });

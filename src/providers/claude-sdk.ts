@@ -23,7 +23,7 @@ import { getThreadSession, setThreadSession, clearThreadSession } from '../db/se
 import { log } from '../lib/log.ts';
 import { loadConfig } from '../lib/config.ts';
 import { touchHeartbeat } from '../lib/heartbeat.ts';
-import { buildCanUseTool, NOTHINGCLAW_MCP_TOOLS } from '../lib/tool-permissions.ts';
+import { buildCanUseTool, MARSCLAW_MCP_TOOLS } from '../lib/tool-permissions.ts';
 import { archiveConversation } from '../lib/conversation-archive.ts';
 import { isOverBudget, recordUsage, todaySpendUsd } from '../lib/cost-tracker.ts';
 import { isUsingMeteredApi } from './claude.ts';
@@ -83,10 +83,10 @@ const MCP_ENV_PASSTHROUGH = [
   // Logging
   'LOG_LEVEL',
   // App config the MCP server consults
-  'NOTHINGCLAW_DB',
-  'NOTHINGCLAW_CONFIG',
-  'NOTHINGCLAW_VOICE_OUT',
-  'NOTHINGCLAW_HEARTBEAT',
+  'MARSCLAW_DB',
+  'MARSCLAW_CONFIG',
+  'MARSCLAW_VOICE_OUT',
+  'MARSCLAW_HEARTBEAT',
   // Google OAuth — needed by gmail/drive/etc tools. Refresh tokens live in
   // macOS Keychain, NOT in env; only the client id + secret pair comes
   // through here.
@@ -104,13 +104,13 @@ function buildMcpChildEnv(threadId: string): Record<string, string> {
     const v = process.env[key];
     if (v !== undefined) env[key] = v;
   }
-  env.NOTHINGCLAW_THREAD_ID = threadId;
+  env.MARSCLAW_THREAD_ID = threadId;
   return env;
 }
 
 function mcpServers(threadId: string): Record<string, McpServerConfig> {
   return {
-    nothingclaw: {
+    marsclaw: {
       type: 'stdio',
       // Use the same bun binary that's running the parent. Relying on PATH
       // lookup breaks under launchd, whose PATH won't include nvm/asdf dirs.
@@ -190,7 +190,7 @@ class ClaudeSession {
         // (canUseTool also returns allow for any `mcp__*` tool, but the SDK
         // in `default` mode sometimes routes MCP calls differently from
         // built-in tools — listing them here is the belt-and-braces path.)
-        allowedTools: NOTHINGCLAW_MCP_TOOLS,
+        allowedTools: MARSCLAW_MCP_TOOLS,
         settingSources: ['project', 'user'],
         systemPrompt: {
           type: 'preset',
@@ -402,8 +402,8 @@ const RETRY_DELAY_MS = 2000;
 import { statSync } from 'node:fs';
 
 const SWEEP_INTERVAL_MS = 30_000;
-const HEARTBEAT_PATH = process.env.NOTHINGCLAW_HEARTBEAT ?? 'data/heartbeat';
-const AGENT_TIMEOUT_MS = Number(process.env.NOTHINGCLAW_AGENT_TIMEOUT_MS ?? 300_000);
+const HEARTBEAT_PATH = process.env.MARSCLAW_HEARTBEAT ?? 'data/heartbeat';
+const AGENT_TIMEOUT_MS = Number(process.env.MARSCLAW_AGENT_TIMEOUT_MS ?? 300_000);
 const ABSOLUTE_TURN_CEILING_MS = AGENT_TIMEOUT_MS + 60_000;
 const CLAIM_HEARTBEAT_STALE_MS = 60_000;
 

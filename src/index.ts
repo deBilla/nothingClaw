@@ -69,7 +69,7 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
 }
 
 // WhatsApp (Baileys, QR-scan auth on first run)
-if (process.env.NOTHINGCLAW_WHATSAPP === '1') {
+if (process.env.MARSCLAW_WHATSAPP === '1') {
   const { createWhatsappChannel } = await import('./channels/whatsapp.ts');
   const ch = await createWhatsappChannel({ onMessage });
   router.register('whatsapp', ch);

@@ -4,8 +4,8 @@ import { existsSync, readFileSync, readdirSync, rmSync, mkdirSync } from 'node:f
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const ARCHIVE_DIR = join(tmpdir(), `nothingclaw-archive-${process.pid}`);
-process.env.NOTHINGCLAW_CONVERSATIONS = ARCHIVE_DIR;
+const ARCHIVE_DIR = join(tmpdir(), `marsclaw-archive-${process.pid}`);
+process.env.MARSCLAW_CONVERSATIONS = ARCHIVE_DIR;
 
 const { archiveConversation } = await import('../src/lib/conversation-archive.ts');
 const { runMigrations } = await import('../src/db/migrations.ts');

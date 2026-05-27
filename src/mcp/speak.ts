@@ -8,8 +8,8 @@ import { resolve } from 'node:path';
 import { DB_PATH } from '../db/connection.ts';
 import { synthesize, KOKORO_OUTPUT_FORMAT } from '../voice.ts';
 
-const OUT_DIR = process.env.NOTHINGCLAW_VOICE_OUT ?? 'data/voice-out';
-const THREAD_ID = process.env.NOTHINGCLAW_THREAD_ID ?? '';
+const OUT_DIR = process.env.MARSCLAW_VOICE_OUT ?? 'data/voice-out';
+const THREAD_ID = process.env.MARSCLAW_THREAD_ID ?? '';
 const VOICE = process.env.KOKORO_VOICE ?? 'af_heart';
 
 let _db: Database | null = null;
@@ -40,7 +40,7 @@ export const speakTool = {
       return { content: [{ type: 'text', text: 'Error: text is required' }], isError: true };
     }
     if (!THREAD_ID) {
-      return { content: [{ type: 'text', text: 'Error: NOTHINGCLAW_THREAD_ID not set' }], isError: true };
+      return { content: [{ type: 'text', text: 'Error: MARSCLAW_THREAD_ID not set' }], isError: true };
     }
 
     try {

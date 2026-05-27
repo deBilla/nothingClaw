@@ -1,9 +1,9 @@
 // Switch the active agent provider without rerunning full setup.
 //
 // Usage:
-//   nothingclaw provider             — interactive picker
-//   nothingclaw provider gemini      — switch directly
-//   nothingclaw provider claude
+//   marsclaw provider             — interactive picker
+//   marsclaw provider gemini      — switch directly
+//   marsclaw provider claude
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

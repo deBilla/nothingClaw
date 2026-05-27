@@ -1,15 +1,15 @@
 // WhatsApp channel management.
 //
 // Usage:
-//   nothingclaw whatsapp reset    Clear linked-device auth (forces re-scan)
-//   nothingclaw whatsapp status   Show whether currently linked
-//   nothingclaw whatsapp          Print usage
+//   marsclaw whatsapp reset    Clear linked-device auth (forces re-scan)
+//   marsclaw whatsapp status   Show whether currently linked
+//   marsclaw whatsapp          Print usage
 
 import { existsSync, rmSync, readdirSync } from 'node:fs';
 import { printBanner } from './branding.ts';
 
-const AUTH_DIR = process.env.NOTHINGCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
-const MEDIA_DIR = process.env.NOTHINGCLAW_WHATSAPP_MEDIA ?? 'data/whatsapp-media';
+const AUTH_DIR = process.env.MARSCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
+const MEDIA_DIR = process.env.MARSCLAW_WHATSAPP_MEDIA ?? 'data/whatsapp-media';
 
 const ok   = (s: string) => console.log(`\x1b[32m✓\x1b[0m ${s}`);
 const info = (s: string) => console.log(`  ${s}`);
@@ -57,7 +57,7 @@ switch (sub) {
 
   case 'help':
   default:
-    console.log('Usage: nothingclaw whatsapp <command>\n');
+    console.log('Usage: marsclaw whatsapp <command>\n');
     console.log('Commands:');
     console.log('  reset         Clear linked-device auth — next start triggers a new QR');
     console.log('  status        Show link state and cached media count');

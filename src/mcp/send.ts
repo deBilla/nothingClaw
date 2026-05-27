@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { DB_PATH } from '../db/connection.ts';
 
-const THREAD_ID = process.env.NOTHINGCLAW_THREAD_ID ?? '';
+const THREAD_ID = process.env.MARSCLAW_THREAD_ID ?? '';
 
 let _db: Database | null = null;
 function db(): Database {
@@ -29,7 +29,7 @@ export const sendTool = {
       return { content: [{ type: 'text', text: 'Error: text is required' }], isError: true };
     }
     if (!THREAD_ID) {
-      return { content: [{ type: 'text', text: 'Error: NOTHINGCLAW_THREAD_ID not set' }], isError: true };
+      return { content: [{ type: 'text', text: 'Error: MARSCLAW_THREAD_ID not set' }], isError: true };
     }
     db().query('INSERT INTO outbox (thread_id, text) VALUES (?, ?)').run(THREAD_ID, text);
     return { content: [{ type: 'text', text: 'Queued.' }] };

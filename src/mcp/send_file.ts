@@ -12,7 +12,7 @@ import { basename, resolve } from 'node:path';
 import { DB_PATH } from '../db/connection.ts';
 import { loadConfig } from '../lib/config.ts';
 
-const THREAD_ID = process.env.NOTHINGCLAW_THREAD_ID ?? '';
+const THREAD_ID = process.env.MARSCLAW_THREAD_ID ?? '';
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB — WhatsApp's document limit is ~100MB
 
 let _db: Database | null = null;
@@ -54,7 +54,7 @@ export const sendFileTool = {
       return { content: [{ type: 'text', text: 'Error: path is required' }], isError: true };
     }
     if (!THREAD_ID) {
-      return { content: [{ type: 'text', text: 'Error: NOTHINGCLAW_THREAD_ID not set' }], isError: true };
+      return { content: [{ type: 'text', text: 'Error: MARSCLAW_THREAD_ID not set' }], isError: true };
     }
 
     const absPath = resolve(rawPath);

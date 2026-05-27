@@ -39,7 +39,7 @@ const tools = [
 ];
 
 const server = new Server(
-  { name: 'nothingclaw', version: '0.1.0' },
+  { name: 'marsclaw', version: '0.1.0' },
   { capabilities: { tools: {} } },
 );
 
@@ -59,4 +59,4 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 });
 
 await server.connect(new StdioServerTransport());
-console.error('[nothingclaw-mcp] ready');
+console.error('[marsclaw-mcp] ready');

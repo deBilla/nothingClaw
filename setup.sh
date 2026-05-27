@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# nothingClaw bootstrap installer.
+# marsClaw bootstrap installer.
 #
 # Detects OS, ensures nvm + Node (via nvm), installs Bun (via npm), installs
 # deps, then hands off to the interactive setup CLI.
@@ -19,7 +19,7 @@ bold() { printf "\033[1m%s\033[0m\n" "$1"; }
 ok()   { printf "\033[32m✓\033[0m %s\n" "$1"; }
 err()  { printf "\033[31merror:\033[0m %s\n" "$1" >&2; }
 
-bold "nothingClaw setup"
+bold "marsClaw setup"
 echo
 
 OS="$(uname -s)"

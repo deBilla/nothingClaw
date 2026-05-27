@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "nothingclaw": {
+    "marsclaw": {
       "command": "bun",
       "args": ["run", "src/mcp/server.ts"]
     }

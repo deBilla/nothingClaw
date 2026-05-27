@@ -14,7 +14,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { log } from './log.ts';
 
-const USAGE_PATH = process.env.NOTHINGCLAW_USAGE ?? 'data/usage.jsonl';
+const USAGE_PATH = process.env.MARSCLAW_USAGE ?? 'data/usage.jsonl';
 
 export interface UsageEntry {
   at: string; // ISO timestamp

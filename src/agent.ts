@@ -14,7 +14,7 @@ const provider = pickProvider();
 const config = loadConfig();
 const PROJECT_ROOT = process.cwd();
 const HISTORY_TURNS = 20;
-const AGENT_TIMEOUT_MS = Number(process.env.NOTHINGCLAW_AGENT_TIMEOUT_MS ?? 300_000);
+const AGENT_TIMEOUT_MS = Number(process.env.MARSCLAW_AGENT_TIMEOUT_MS ?? 300_000);
 
 function buildPrompt(history: HistoryRow[], userText: string, context: string): string {
   const lines: string[] = [];
@@ -133,7 +133,7 @@ function runProviderWith(
       cwd: PROJECT_ROOT,
       env: {
         ...process.env,
-        NOTHINGCLAW_THREAD_ID: threadId,
+        MARSCLAW_THREAD_ID: threadId,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

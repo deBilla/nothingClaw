@@ -213,7 +213,7 @@ interface ChannelChoices {
 async function askChannels(currentVoice: boolean, currentPhone: string): Promise<ChannelChoices> {
   bold('7. WhatsApp + voice');
 
-  const whatsappAlready = envHas('NOTHINGCLAW_WHATSAPP');
+  const whatsappAlready = envHas('MARSCLAW_WHATSAPP');
   info('Connects via Baileys (unofficial WhatsApp library) — QR scan from your phone.');
   if (whatsappAlready) info('  Currently enabled in .env.');
   warn('Unofficial: not endorsed by Meta. Use at your own risk.');
@@ -296,10 +296,10 @@ function seedMemory(
 // .env holds secrets + channel-enable flags. Non-secret runtime config
 // (bot_name, allowed_jids, timezone, etc.) lives in data/config.json.
 //
-// We manage exactly: AGENT_PROVIDER, NOTHINGCLAW_WHATSAPP.
+// We manage exactly: AGENT_PROVIDER, MARSCLAW_WHATSAPP.
 // Telegram/Slack tokens hand-added by power users are left untouched.
 function writeEnv(provider: ProviderName, whatsappEnabled: boolean): void {
-  const managed = new Set(['AGENT_PROVIDER', 'NOTHINGCLAW_WHATSAPP']);
+  const managed = new Set(['AGENT_PROVIDER', 'MARSCLAW_WHATSAPP']);
   const existing = existsSync('.env') ? readFileSync('.env', 'utf-8') : '';
   const lines = existing.split('\n').filter((l) => {
     if (!l.trim() || l.trim().startsWith('#')) return true;
@@ -307,7 +307,7 @@ function writeEnv(provider: ProviderName, whatsappEnabled: boolean): void {
     return !managed.has(key);
   });
   lines.push(`AGENT_PROVIDER=${provider}`);
-  if (whatsappEnabled) lines.push('NOTHINGCLAW_WHATSAPP=1');
+  if (whatsappEnabled) lines.push('MARSCLAW_WHATSAPP=1');
   const out = lines.join('\n').replace(/\n+$/, '') + '\n';
   writeAtomic('.env', out);
 }
@@ -441,7 +441,7 @@ async function main(): Promise<void> {
 
   // Offer to launch the bot right away. For WhatsApp this is the step that
   // actually captures the pairing code — the bot must be running and connected
-  // to receive it. (If you run nothingClaw as a service, decline this and use
+  // to receive it. (If you run marsClaw as a service, decline this and use
   // `bun run service restart` instead to avoid two instances.)
   bold('Done.');
   const startNow =
@@ -461,7 +461,7 @@ async function main(): Promise<void> {
       info('  When pairing is done, Ctrl+C — I\'ll bring the service back (else: bun run service start).');
     }
 
-    info('Starting nothingClaw — press Ctrl+C when pairing is done.\n');
+    info('Starting marsClaw — press Ctrl+C when pairing is done.\n');
     // Ignore Ctrl+C in this parent so the child (bot) owns it; we resume after
     // it exits to restore the service. Without this, SIGINT would also kill
     // setup before it could restart the service.

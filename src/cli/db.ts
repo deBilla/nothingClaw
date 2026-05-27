@@ -68,6 +68,6 @@ switch (sub) {
     break;
   default:
     console.error(`Unknown db subcommand: ${sub}`);
-    console.error('Usage: nothingclaw db [vacuum | integrity | stats]');
+    console.error('Usage: marsclaw db [vacuum | integrity | stats]');
     process.exit(1);
 }

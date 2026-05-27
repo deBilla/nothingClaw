@@ -1,6 +1,6 @@
 // In-process log rotation.
 //
-// When `NOTHINGCLAW_LOG_FILE` is set, the logger appends to that file.
+// When `MARSCLAW_LOG_FILE` is set, the logger appends to that file.
 // This module checks file size every 60s and, when it exceeds the cap,
 // rotates: `name → name.1`, `.1 → .2`, ..., dropping `.5`. The active
 // stream is reopened against the fresh file.
@@ -14,8 +14,8 @@ import { createWriteStream, existsSync, renameSync, statSync, type WriteStream }
 import { dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 
-const MAX_BYTES = Number(process.env.NOTHINGCLAW_LOG_MAX_BYTES ?? 10 * 1024 * 1024);
-const ROTATIONS = Number(process.env.NOTHINGCLAW_LOG_ROTATIONS ?? 5);
+const MAX_BYTES = Number(process.env.MARSCLAW_LOG_MAX_BYTES ?? 10 * 1024 * 1024);
+const ROTATIONS = Number(process.env.MARSCLAW_LOG_ROTATIONS ?? 5);
 const CHECK_INTERVAL_MS = 60_000;
 
 let stream: WriteStream | null = null;

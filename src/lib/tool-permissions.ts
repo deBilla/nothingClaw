@@ -8,14 +8,14 @@
 // 2. Bash gets an additional destructive-command blocklist. Standard rules:
 //      rm -rf /, chmod 000, dd of=, plus user-extendable config.extra_bash_denylist.
 //
-// Escape hatch: NOTHINGCLAW_TOOL_PERMISSIONS=bypass restores pre-hardening
+// Escape hatch: MARSCLAW_TOOL_PERMISSIONS=bypass restores pre-hardening
 // behaviour (everything allowed). One-release migration aid; remove next.
 
 import path from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { log } from './log.ts';
-import type { NothingclawConfig } from './config.ts';
+import type { MarsclawConfig } from './config.ts';
 
 const FS_TOOLS = new Set(['Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'NotebookEdit']);
 // Write-style tools: when allowed, we ensure the parent directory exists
@@ -74,9 +74,9 @@ function extractPaths(input: Record<string, unknown>): string[] {
   return paths;
 }
 
-export function buildCanUseTool(config: NothingclawConfig): CanUseTool {
-  if (process.env.NOTHINGCLAW_TOOL_PERMISSIONS === 'bypass') {
-    log.warn('NOTHINGCLAW_TOOL_PERMISSIONS=bypass — agent has unrestricted tool access (escape hatch)');
+export function buildCanUseTool(config: MarsclawConfig): CanUseTool {
+  if (process.env.MARSCLAW_TOOL_PERMISSIONS === 'bypass') {
+    log.warn('MARSCLAW_TOOL_PERMISSIONS=bypass — agent has unrestricted tool access (escape hatch)');
     return async (_toolName, input) => allowResult(input);
   }
 
@@ -129,7 +129,7 @@ export function buildCanUseTool(config: NothingclawConfig): CanUseTool {
           return denyResult(
             `Path ${t} is outside the allowed_paths. Add "${path.resolve(t)}" to ` +
               `data/config.json allowed_paths to grant access, or restart with ` +
-              `NOTHINGCLAW_TOOL_PERMISSIONS=bypass for a one-off override.`,
+              `MARSCLAW_TOOL_PERMISSIONS=bypass for a one-off override.`,
           );
         }
       }
@@ -166,27 +166,27 @@ export function buildCanUseTool(config: NothingclawConfig): CanUseTool {
 // Passed to the SDK `allowedTools` so they're auto-allowed without going
 // through any prompt flow at all (belt-and-braces with the canUseTool path
 // above).
-export const NOTHINGCLAW_MCP_TOOLS = [
-  'mcp__nothingclaw__send_message',
-  'mcp__nothingclaw__send_file',
-  'mcp__nothingclaw__speak',
-  'mcp__nothingclaw__google_accounts',
-  'mcp__nothingclaw__gmail_recent',
-  'mcp__nothingclaw__gmail_search',
-  'mcp__nothingclaw__gmail_get',
-  'mcp__nothingclaw__gmail_send',
-  'mcp__nothingclaw__contacts_search',
-  'mcp__nothingclaw__calendar_list_events',
-  'mcp__nothingclaw__calendar_create_event',
-  'mcp__nothingclaw__calendar_raw',
-  'mcp__nothingclaw__drive_search',
-  'mcp__nothingclaw__drive_read',
-  'mcp__nothingclaw__drive_raw',
-  'mcp__nothingclaw__sheets_read',
-  'mcp__nothingclaw__sheets_write',
-  'mcp__nothingclaw__sheets_raw',
-  'mcp__nothingclaw__docs_read',
-  'mcp__nothingclaw__docs_raw',
-  'mcp__nothingclaw__slides_read',
-  'mcp__nothingclaw__slides_raw',
+export const MARSCLAW_MCP_TOOLS = [
+  'mcp__marsclaw__send_message',
+  'mcp__marsclaw__send_file',
+  'mcp__marsclaw__speak',
+  'mcp__marsclaw__google_accounts',
+  'mcp__marsclaw__gmail_recent',
+  'mcp__marsclaw__gmail_search',
+  'mcp__marsclaw__gmail_get',
+  'mcp__marsclaw__gmail_send',
+  'mcp__marsclaw__contacts_search',
+  'mcp__marsclaw__calendar_list_events',
+  'mcp__marsclaw__calendar_create_event',
+  'mcp__marsclaw__calendar_raw',
+  'mcp__marsclaw__drive_search',
+  'mcp__marsclaw__drive_read',
+  'mcp__marsclaw__drive_raw',
+  'mcp__marsclaw__sheets_read',
+  'mcp__marsclaw__sheets_write',
+  'mcp__marsclaw__sheets_raw',
+  'mcp__marsclaw__docs_read',
+  'mcp__marsclaw__docs_raw',
+  'mcp__marsclaw__slides_read',
+  'mcp__marsclaw__slides_raw',
 ];

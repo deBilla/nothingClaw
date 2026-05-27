@@ -18,7 +18,7 @@ import type { Database } from 'bun:sqlite';
 import { writeAtomic } from './atomic.ts';
 import { log } from './log.ts';
 
-const ARCHIVE_DIR = process.env.NOTHINGCLAW_CONVERSATIONS ?? 'conversations';
+const ARCHIVE_DIR = process.env.MARSCLAW_CONVERSATIONS ?? 'conversations';
 // Max turns to dump per archive. The DB has everything; this just bounds the
 // file size. 200 turns ≈ 1-2k lines of markdown, plenty for any human review.
 const MAX_TURNS = 200;

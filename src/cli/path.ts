@@ -1,4 +1,4 @@
-// `bun run nothingclaw path <sub>` — manage data/config.json allowed_paths.
+// `bun run marsclaw path <sub>` — manage data/config.json allowed_paths.
 //
 // Subcommands:
 //   list                       Show the current allow-list (with cwd-default note)
@@ -42,12 +42,12 @@ function showList(): void {
     info(p);
   }
   console.log();
-  info(dim('Edit via: nothingclaw path add <path> | path remove <path> | path reset'));
+  info(dim('Edit via: marsclaw path add <path> | path remove <path> | path reset'));
 }
 
 function add(p: string): void {
   if (!p) {
-    warn('Usage: nothingclaw path add <path>');
+    warn('Usage: marsclaw path add <path>');
     process.exit(1);
   }
   const abs = resolve(p);
@@ -64,7 +64,7 @@ function add(p: string): void {
 
 function remove(p: string): void {
   if (!p) {
-    warn('Usage: nothingclaw path remove <path>');
+    warn('Usage: marsclaw path remove <path>');
     process.exit(1);
   }
   const abs = resolve(p);
@@ -102,6 +102,6 @@ switch (sub) {
     break;
   default:
     warn(`Unknown subcommand: ${sub}`);
-    info('Usage: nothingclaw path [list | add <path> | remove <path> | reset]');
+    info('Usage: marsclaw path [list | add <path> | remove <path> | reset]');
     process.exit(1);
 }

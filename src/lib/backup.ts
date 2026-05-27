@@ -1,7 +1,7 @@
 // Daily backup of the operational state.
 //
 // Targets (whichever exist):
-//   data/nothingclaw.db    →  data/backups/nothingclaw-YYYY-MM-DD.db
+//   data/marsclaw.db    →  data/backups/marsclaw-YYYY-MM-DD.db
 //   MEMORY.md              →  data/backups/MEMORY-YYYY-MM-DD.md
 //   data/whatsapp-auth/    →  data/backups/whatsapp-auth-YYYY-MM-DD.tar.gz
 //
@@ -24,9 +24,9 @@ import { Database } from 'bun:sqlite';
 import { DB_PATH } from '../db/connection.ts';
 import { log } from './log.ts';
 
-const BACKUP_DIR = process.env.NOTHINGCLAW_BACKUP_DIR ?? 'data/backups';
-const KEEP_DAYS = Number(process.env.NOTHINGCLAW_BACKUP_KEEP ?? 7);
-const WA_AUTH_DIR = process.env.NOTHINGCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
+const BACKUP_DIR = process.env.MARSCLAW_BACKUP_DIR ?? 'data/backups';
+const KEEP_DAYS = Number(process.env.MARSCLAW_BACKUP_KEEP ?? 7);
+const WA_AUTH_DIR = process.env.MARSCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
 const MEMORY_PATH = 'MEMORY.md';
 
 function today(): string {
@@ -36,7 +36,7 @@ function today(): string {
 function backupDb(date: string): string | null {
   if (!existsSync(DB_PATH)) return null;
   mkdirSync(BACKUP_DIR, { recursive: true });
-  const out = join(BACKUP_DIR, `nothingclaw-${date}.db`);
+  const out = join(BACKUP_DIR, `marsclaw-${date}.db`);
   // VACUUM INTO is the right SQLite primitive for backups: atomic, no
   // long write lock, produces a clean defragmented copy.
   const src = new Database(DB_PATH, { readonly: true });
@@ -112,7 +112,7 @@ let scheduleTimer: ReturnType<typeof setInterval> | null = null;
 
 export function startBackupSchedule(): void {
   const dailyMs = 24 * 60 * 60 * 1000;
-  const todayFile = join(BACKUP_DIR, `nothingclaw-${today()}.db`);
+  const todayFile = join(BACKUP_DIR, `marsclaw-${today()}.db`);
   if (!existsSync(todayFile)) {
     // Run now if no backup exists for today.
     try {

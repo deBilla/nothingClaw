@@ -4,7 +4,7 @@
 //   1. Refuse if working tree is dirty (override with --force).
 //   2. `git pull --ff-only`
 //   3. `bun install --frozen-lockfile` (or `bun install` if lockfile changed)
-//   4. `launchctl kickstart -k gui/$UID/com.nothingclaw` (zero-downtime
+//   4. `launchctl kickstart -k gui/$UID/com.marsclaw` (zero-downtime
 //      restart; KeepAlive will respawn into the new code)
 //
 // Doesn't touch data/, MEMORY.md, or .env. A backup is taken before the
@@ -67,7 +67,7 @@ ok('dependencies installed.');
 
 // Step 5: restart service if launchd-managed.
 const uid = run('id', ['-u']).out.trim();
-const label = `gui/${uid}/com.nothingclaw`;
+const label = `gui/${uid}/com.marsclaw`;
 const printed = run('launchctl', ['print', label]);
 if (printed.code === 0) {
   info('Restarting via launchctl…');
@@ -75,7 +75,7 @@ if (printed.code === 0) {
   if (kick.code !== 0) {
     fail(`launchctl kickstart failed:\n${kick.err}\n\nRestart manually: launchctl kickstart -k ${label}`);
   }
-  ok('service restarted. Tail logs/nothingclaw.log to verify.');
+  ok('service restarted. Tail logs/marsclaw.log to verify.');
 } else {
   info('Service not installed via launchd — restart the bot manually.');
 }

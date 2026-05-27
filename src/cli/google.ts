@@ -1,11 +1,11 @@
 // Google account management (multi-account capable).
 //
-//   nothingclaw google login [alias] [--scope <url>]...   OAuth dance, stash refresh token
-//   nothingclaw google list                                List configured accounts
-//   nothingclaw google use <alias>                         Mark <alias> as the default
-//   nothingclaw google status [alias]                      Show creds + scopes for an account
-//   nothingclaw google logout [alias]                      Remove a stored account
-//   nothingclaw google test [alias]                        List 5 most-recent Gmail subjects
+//   marsclaw google login [alias] [--scope <url>]...   OAuth dance, stash refresh token
+//   marsclaw google list                                List configured accounts
+//   marsclaw google use <alias>                         Mark <alias> as the default
+//   marsclaw google status [alias]                      Show creds + scopes for an account
+//   marsclaw google logout [alias]                      Remove a stored account
+//   marsclaw google test [alias]                        List 5 most-recent Gmail subjects
 
 import {
   listAccounts,
@@ -42,7 +42,7 @@ switch (sub) {
   case 'list': {
     const idx = listAccounts();
     if (idx.accounts.length === 0) {
-      console.log('No Google accounts connected. Run: nothingclaw google login [alias]');
+      console.log('No Google accounts connected. Run: marsclaw google login [alias]');
       break;
     }
     for (const a of idx.accounts) {
@@ -53,7 +53,7 @@ switch (sub) {
   case 'use': {
     const alias = args[1];
     if (!alias) {
-      console.error('Usage: nothingclaw google use <alias>');
+      console.error('Usage: marsclaw google use <alias>');
       process.exit(1);
     }
     setDefaultAccount(alias);
@@ -77,7 +77,7 @@ switch (sub) {
   case 'logout': {
     const alias = args[1];
     if (!alias) {
-      console.error('Usage: nothingclaw google logout <alias>');
+      console.error('Usage: marsclaw google logout <alias>');
       process.exit(1);
     }
     const removed = removeAccount(alias);
@@ -94,7 +94,7 @@ switch (sub) {
   }
   default:
     console.error(`Unknown google subcommand: ${sub}`);
-    console.error('Usage: nothingclaw google [login|list|use|status|logout|test]');
+    console.error('Usage: marsclaw google [login|list|use|status|logout|test]');
     process.exit(1);
 }
 

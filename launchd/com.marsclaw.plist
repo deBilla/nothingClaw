@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.nothingclaw</string>
+    <string>com.marsclaw</string>
     <key>ProgramArguments</key>
     <array>
         <string>{{BUN_PATH}}</string>
@@ -25,10 +25,10 @@
         <string>{{HOME}}</string>
         <key>LOG_LEVEL</key>
         <string>info</string>
-        <key>NOTHINGCLAW_LOG_FILE</key>
-        <string>{{PROJECT_ROOT}}/logs/nothingclaw.log</string>
+        <key>MARSCLAW_LOG_FILE</key>
+        <string>{{PROJECT_ROOT}}/logs/marsclaw.log</string>
     </dict>
-    <!-- We tee into NOTHINGCLAW_LOG_FILE ourselves (rotated in-process).
+    <!-- We tee into MARSCLAW_LOG_FILE ourselves (rotated in-process).
          Keep launchd's own stdout/stderr as a fallback in case the
          logger never starts (early boot crash, missing dir, etc.). -->
     <key>StandardOutPath</key>

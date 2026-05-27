@@ -7,10 +7,10 @@
 // *current* local time + timezone + location to each turn — cheap, and keeps
 // the model current even within a long-lived resumed session.
 
-import type { NothingclawConfig } from './config.ts';
+import type { MarsclawConfig } from './config.ts';
 import { resolveTimezone } from './timezone.ts';
 
-export function buildTurnContext(config: NothingclawConfig, now: Date = new Date()): string {
+export function buildTurnContext(config: MarsclawConfig, now: Date = new Date()): string {
   const tz = resolveTimezone(config.timezone);
   const when = now.toLocaleString('en-US', {
     timeZone: tz,

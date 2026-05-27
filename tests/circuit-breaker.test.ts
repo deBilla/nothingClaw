@@ -3,8 +3,8 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const TEST_CB_PATH = join(tmpdir(), `nothingclaw-cb-${process.pid}.json`);
-process.env.NOTHINGCLAW_CIRCUIT_BREAKER = TEST_CB_PATH;
+const TEST_CB_PATH = join(tmpdir(), `marsclaw-cb-${process.pid}.json`);
+process.env.MARSCLAW_CIRCUIT_BREAKER = TEST_CB_PATH;
 
 // Import AFTER env is set so the module-level const picks it up.
 const { enforceStartupBackoff, resetCircuitBreaker } = await import('../src/lib/circuit-breaker.ts');

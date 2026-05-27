@@ -13,7 +13,7 @@ import pino from 'pino';
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, type WASocket } from 'baileys';
 import type { Boom } from '@hapi/boom';
 
-const AUTH_DIR = process.env.NOTHINGCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
+const AUTH_DIR = process.env.MARSCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
 
 // A `me`-set-but-`registered:false` creds.json is the fingerprint of a prior
 // aborted scan: WhatsApp accepted the device and wrote our identity, but the

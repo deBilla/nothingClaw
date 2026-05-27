@@ -4,7 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { loadConfig } from '../lib/config.ts';
 
-const USAGE_PATH = process.env.NOTHINGCLAW_USAGE ?? 'data/usage.jsonl';
+const USAGE_PATH = process.env.MARSCLAW_USAGE ?? 'data/usage.jsonl';
 
 interface Entry {
   at: string;
@@ -103,6 +103,6 @@ switch (sub) {
   }
   default:
     console.error(`Unknown usage subcommand: ${sub}`);
-    console.error('Usage: nothingclaw usage [today | week | by-thread]');
+    console.error('Usage: marsclaw usage [today | week | by-thread]');
     process.exit(1);
 }

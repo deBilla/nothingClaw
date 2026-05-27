@@ -1,11 +1,11 @@
 // Manage the local Whisper (STT) + Kokoro (TTS) sidecars.
 //
 // Usage:
-//   nothingclaw voice install      Run tools/setup-voice.sh (venv + models)
-//   nothingclaw voice start        Start both sidecars (detached)
-//   nothingclaw voice stop         Stop both
-//   nothingclaw voice restart      Stop + start
-//   nothingclaw voice status       Show running / healthy for each
+//   marsclaw voice install      Run tools/setup-voice.sh (venv + models)
+//   marsclaw voice start        Start both sidecars (detached)
+//   marsclaw voice stop         Stop both
+//   marsclaw voice restart      Stop + start
+//   marsclaw voice status       Show running / healthy for each
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
@@ -122,14 +122,14 @@ async function main(): Promise<void> {
     case 'status':  for (const s of SIDECARS) await statusOne(s); break;
     case 'help':
     default:
-      console.log('Usage: nothingclaw voice <command>\n');
+      console.log('Usage: marsclaw voice <command>\n');
       console.log('Commands:');
       console.log('  install    Create Python venv + install faster-whisper + kokoro-onnx + cache models');
       console.log('  start      Start both Whisper (STT) and Kokoro (TTS) sidecars');
       console.log('  stop       Stop both sidecars');
       console.log('  restart    Stop + start');
       console.log('  status     Show whether each is running and healthy');
-      console.log('\nAfter install, set NOTHINGCLAW_VOICE=1 in .env to enable voice processing.');
+      console.log('\nAfter install, set MARSCLAW_VOICE=1 in .env to enable voice processing.');
       break;
   }
 }

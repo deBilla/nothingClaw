@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export const SERVICE_LABEL = 'com.nothingclaw';
+export const SERVICE_LABEL = 'com.marsclaw';
 export const LAUNCHAGENTS_DIR = join(homedir(), 'Library', 'LaunchAgents');
 export const INSTALLED_PLIST = join(LAUNCHAGENTS_DIR, `${SERVICE_LABEL}.plist`);
 

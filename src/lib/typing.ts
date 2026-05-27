@@ -12,7 +12,7 @@
 import { statSync } from 'node:fs';
 import { log } from './log.ts';
 
-const HEARTBEAT_PATH = process.env.NOTHINGCLAW_HEARTBEAT ?? 'data/heartbeat';
+const HEARTBEAT_PATH = process.env.MARSCLAW_HEARTBEAT ?? 'data/heartbeat';
 const REFRESH_MS = 4000;
 // Initial grace period: fire typing unconditionally for this long after
 // startTypingRefresh — covers the first few seconds before the SDK has

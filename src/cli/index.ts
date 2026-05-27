@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// nothingClaw CLI — subcommand router.
+// marsClaw CLI — subcommand router.
 
 export {};
 
@@ -60,10 +60,10 @@ switch (cmd) {
 }
 
 function printHelp(): void {
-  console.log(`nothingclaw — personal chat agent
+  console.log(`marsclaw — personal chat agent
 
 Usage:
-  nothingclaw [command]
+  marsclaw [command]
 
 Commands:
   setup                       Interactive setup (provider, login, channels)
