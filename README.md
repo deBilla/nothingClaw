@@ -68,7 +68,7 @@ bun run smoke [prompt]              # fire a synthetic message end-to-end
 
 ## Documentation
 
-Browse the docs site at **<https://deBilla.github.io/marsclaw/>** — or read the markdown directly in [docs/](docs/):
+Browse the docs site at **<https://deBilla.github.io/marsClaw/>** — or read the markdown directly in [docs/](docs/):
 
 - [docs/architecture.md](docs/architecture.md) — message flow, components, SQLite schema, per-thread serialization
 - [docs/configuration.md](docs/configuration.md) — `.env` and `data/config.json` reference, precedence rules

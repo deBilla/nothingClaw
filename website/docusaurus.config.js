@@ -8,10 +8,10 @@ const config = {
   favicon: 'img/favicon.svg',
 
   url: 'https://deBilla.github.io',
-  baseUrl: '/marsclaw/',
+  baseUrl: '/marsClaw/',
 
   organizationName: 'deBilla',
-  projectName: 'marsclaw',
+  projectName: 'marsClaw',
   trailingSlash: false,
 
   onBrokenLinks: 'warn',
