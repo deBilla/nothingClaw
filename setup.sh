@@ -9,9 +9,11 @@ set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-# Node version installed through nvm. "--lts" tracks the latest LTS; override
-# with e.g. NODE_VERSION=22 for a pinned, reproducible version.
-NODE_VERSION="${NODE_VERSION:---lts}"
+# Node version installed through nvm. Pinned to an LTS major (not "--lts", which
+# drifts to whatever the newest LTS line is and could pull a brand-new major the
+# agent CLI doesn't support yet). nvm install N grabs the latest N.x, so we still
+# get patch/security updates within the line. Bump this to move the pin.
+NODE_VERSION="${NODE_VERSION:-22}"
 
 bold() { printf "\033[1m%s\033[0m\n" "$1"; }
 ok()   { printf "\033[32m✓\033[0m %s\n" "$1"; }

@@ -22,8 +22,7 @@ nothingClaw is a single-process Bun app that connects messaging channels (Telegr
 
 ## Requirements
 
-- macOS or Linux (or WSL). Setup auto-installs Bun.
-- Node + npm (for installing the agent CLI globally).
+- macOS or Linux (or WSL). Setup auto-installs nvm, Node (pinned LTS, default 22), and Bun — no prerequisites beyond `curl` and `bash`.
 - A bot/app token from each channel you want to enable.
 - **Voice (optional):** Python 3.10+ and `ffmpeg`. On macOS: `brew install python@3.11 ffmpeg`.
 
