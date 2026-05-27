@@ -1,0 +1,121 @@
+/* marsClaw brand — orange + red Mars on black, "MARS" in orange, "Claw" in white.
+   Palette derived from the logo:
+     orange   #e5472b   (claws + "MARS" text)
+     red      #b73729   (Mars planet)
+     ash      #c8c8c8   (the "Claw" text)
+     black    #0a0a0a   (background)
+*/
+:root {
+  --ifm-color-primary: #e5472b;
+  --ifm-color-primary-dark: #cd3e25;
+  --ifm-color-primary-darker: #c03a1e;
+  --ifm-color-primary-darkest: #9e2f18;
+  --ifm-color-primary-light: #ec5e44;
+  --ifm-color-primary-lighter: #f17560;
+  --ifm-color-primary-lightest: #f99a89;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(229, 71, 43, 0.1);
+
+  --marsclaw-orange: #e5472b;
+  --marsclaw-orange-light: #ff6e54;
+  --marsclaw-red: #b73729;
+  --marsclaw-red-dark: #7a2417;
+  --marsclaw-ash: #c8c8c8;
+  --marsclaw-black: #0a0a0a;
+  --marsclaw-surface: #161616;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #ff6e54;
+  --ifm-color-primary-dark: #ff5638;
+  --ifm-color-primary-darker: #ec5031;
+  --ifm-color-primary-darkest: #c03a1e;
+  --ifm-color-primary-light: #ff8975;
+  --ifm-color-primary-lighter: #ffa490;
+  --ifm-color-primary-lightest: #ffc1b3;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 110, 84, 0.15);
+
+  --ifm-background-color: #0a0a0a;
+  --ifm-background-surface-color: #131313;
+  --ifm-navbar-background-color: #0d0d0d;
+  --ifm-footer-background-color: #060606;
+}
+
+/* Logo glow on hover in the navbar */
+.navbar__logo img {
+  transition: filter 200ms ease;
+}
+.navbar__logo:hover img {
+  filter: drop-shadow(0 0 8px rgba(229, 71, 43, 0.6));
+}
+
+/* Brand the wordmark in the navbar — "mars" orange, "Claw" ash. */
+.navbar__title {
+  background: linear-gradient(
+    90deg,
+    var(--marsclaw-orange) 0%,
+    var(--marsclaw-orange) 38%,
+    var(--marsclaw-ash) 38%,
+    var(--marsclaw-ash) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* Hero background — black with a faint Mars-red radial glow */
+.hero--primary {
+  background:
+    radial-gradient(circle at 50% 110%, rgba(229, 71, 43, 0.25) 0%, transparent 60%),
+    radial-gradient(circle at 50% 30%, rgba(183, 55, 41, 0.15) 0%, transparent 50%),
+    linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
+  border-bottom: 1px solid rgba(229, 71, 43, 0.18);
+}
+
+.hero__subtitle {
+  color: var(--marsclaw-ash);
+}
+
+/* Code block tweaks — match the dark theme */
+.theme-code-block {
+  background: #111 !important;
+  border: 1px solid #1f1f1f;
+}
+
+/* Subtle orange accent on h2 underlines in docs */
+.markdown h2 {
+  border-bottom: 1px solid rgba(229, 71, 43, 0.25);
+  padding-bottom: 0.3rem;
+}
+
+/* Tables: knock back the harsh borders */
+.markdown table thead {
+  background: rgba(229, 71, 43, 0.08);
+}
+.markdown table th {
+  color: var(--ifm-color-primary-lighter);
+  font-weight: 600;
+}
+
+/* Buttons */
+.button--primary {
+  background: linear-gradient(180deg, var(--marsclaw-orange-light), var(--marsclaw-orange));
+  border: none;
+  color: #0a0a0a;
+  font-weight: 700;
+}
+.button--primary:hover {
+  background: linear-gradient(180deg, #ff8975, #ec5031);
+  color: #0a0a0a;
+}
+.button--secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.button--secondary:hover {
+  border-color: var(--marsclaw-orange);
+  color: var(--marsclaw-orange-light);
+}

@@ -1,6 +1,6 @@
 # Channels
 
-marsClaw ships three messaging channels: Telegram, Slack, and WhatsApp. Each is optional; enable any combination. Adapters live in [src/channels/](../src/channels/) and implement the `Channel` interface in [src/channels/types.ts](../src/channels/types.ts).
+marsClaw ships three messaging channels: Telegram, Slack, and WhatsApp. Each is optional; enable any combination. Adapters live in [src/channels/](https://github.com/deBilla/marsclaw/blob/main/src/channels/) and implement the `Channel` interface in [src/channels/types.ts](https://github.com/deBilla/marsclaw/blob/main/src/channels/types.ts).
 
 ```ts
 interface Channel {
@@ -9,7 +9,7 @@ interface Channel {
 }
 ```
 
-Thread IDs are channel-prefixed (`telegram:`, `slack:`, `whatsapp:`); the [ChannelRouter](../src/channels/router.ts) uses the prefix to dispatch outbound sends back to the right adapter.
+Thread IDs are channel-prefixed (`telegram:`, `slack:`, `whatsapp:`); the [ChannelRouter](https://github.com/deBilla/marsclaw/blob/main/src/channels/router.ts) uses the prefix to dispatch outbound sends back to the right adapter.
 
 ## Telegram
 
@@ -22,20 +22,20 @@ The simplest channel to set up.
    ```
 3. Restart the bot. Message your bot from Telegram.
 
-Telegram supports text in/out and the typing indicator. No images, no voice notes on this adapter — Telegram is the boring-and-reliable channel. Adapter: [src/channels/telegram.ts](../src/channels/telegram.ts).
+Telegram supports text in/out and the typing indicator. No images, no voice notes on this adapter — Telegram is the boring-and-reliable channel. Adapter: [src/channels/telegram.ts](https://github.com/deBilla/marsclaw/blob/main/src/channels/telegram.ts).
 
 ## Slack
 
 Uses Socket Mode — no public webhook needed.
 
-1. Create a Slack app at <https://api.slack.com/apps>. Pick "From scratch".
+1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps). Pick "From scratch".
 2. **OAuth & Permissions** → bot token scopes: `chat:write`, `im:history`, `im:read`, `im:write`, `app_mentions:read`, `users:read`. Install to your workspace. Copy `xoxb-…` → `SLACK_BOT_TOKEN`.
 3. **Basic Information** → App-Level Tokens → "Generate Token and Scopes" with scope `connections:write`. Copy `xapp-…` → `SLACK_APP_TOKEN`.
 4. **Socket Mode** → enable.
 5. **Event Subscriptions** → enable, subscribe to bot events: `message.im`, `app_mention`.
 6. Restart the bot. DM the app from Slack.
 
-Adapter: [src/channels/slack.ts](../src/channels/slack.ts). Lazy-loaded — non-Slack users don't pay the `@slack/bolt` import cost.
+Adapter: [src/channels/slack.ts](https://github.com/deBilla/marsclaw/blob/main/src/channels/slack.ts). Lazy-loaded — non-Slack users don't pay the `@slack/bolt` import cost.
 
 ## WhatsApp
 
@@ -92,7 +92,7 @@ If `MARSCLAW_VOICE=1` and the Whisper sidecar is running, inbound voice notes ar
 MARSCLAW_WHATSAPP_VERBOSE=1 bun run start
 ```
 
-Adapter: [src/channels/whatsapp.ts](../src/channels/whatsapp.ts), pairing: [src/channels/whatsapp-link.ts](../src/channels/whatsapp-link.ts).
+Adapter: [src/channels/whatsapp.ts](https://github.com/deBilla/marsclaw/blob/main/src/channels/whatsapp.ts), pairing: [src/channels/whatsapp-link.ts](https://github.com/deBilla/marsclaw/blob/main/src/channels/whatsapp-link.ts).
 
 ## Adding a new channel
 
@@ -113,7 +113,7 @@ export function createMyChannel(opts: { token: string } & ChannelInit): Channel 
 }
 ```
 
-Then wire it up in [src/index.ts](../src/index.ts) behind a feature flag and the prefix in [src/channels/router.ts](../src/channels/router.ts) is automatic — the router routes by the prefix you used.
+Then wire it up in [src/index.ts](https://github.com/deBilla/marsclaw/blob/main/src/index.ts) behind a feature flag and the prefix in [src/channels/router.ts](https://github.com/deBilla/marsclaw/blob/main/src/channels/router.ts) is automatic — the router routes by the prefix you used.
 
 ## Failure modes
 

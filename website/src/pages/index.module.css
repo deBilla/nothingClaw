@@ -1,0 +1,157 @@
+.heroBanner {
+  padding: 5rem 0 4rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroLogo {
+  width: 160px;
+  height: 160px;
+  margin-bottom: 1.5rem;
+  filter: drop-shadow(0 0 24px rgba(229, 71, 43, 0.45));
+}
+
+.heroTitle {
+  font-size: 4.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0.5rem 0 0.75rem;
+  line-height: 1;
+}
+
+.brandOrange {
+  color: #e5472b;
+}
+
+.brandAsh {
+  color: #e8e8e8;
+}
+
+.heroTagline {
+  font-size: 1.25rem;
+  color: #c8c8c8;
+  max-width: 620px;
+  margin: 0 auto 1.5rem;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.installBlock {
+  margin: 2rem auto 0.5rem;
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(229, 71, 43, 0.45);
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  box-shadow: 0 0 24px rgba(229, 71, 43, 0.08);
+}
+
+.installCommand {
+  font-size: 0.95rem;
+  color: #ff8975;
+  background: transparent;
+  border: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .heroTitle { font-size: 3rem; }
+  .heroLogo { width: 120px; height: 120px; }
+  .installCommand { font-size: 0.78rem; white-space: normal; }
+}
+
+.features {
+  padding: 4rem 0 2rem;
+}
+
+.featureCard {
+  height: 100%;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 200ms ease, transform 200ms ease;
+}
+.featureCard:hover {
+  border-color: rgba(229, 71, 43, 0.45);
+  transform: translateY(-2px);
+}
+
+.featureEmoji {
+  font-size: 2.6rem;
+  margin-bottom: 1rem;
+}
+
+.quickStart {
+  padding: 4rem 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(229, 71, 43, 0.04) 100%);
+}
+
+.codeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-top: 2.5rem;
+}
+
+.codeStep {
+  position: relative;
+  padding: 1.75rem 1.5rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.stepNum {
+  position: absolute;
+  top: -14px;
+  left: 1rem;
+  background: linear-gradient(180deg, #ff6e54, #e5472b);
+  color: #0a0a0a;
+  font-weight: 800;
+  font-size: 0.9rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(229, 71, 43, 0.4);
+}
+
+.codeBlock {
+  font-size: 0.85rem;
+  background: #111;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  color: #e8e8e8;
+  border: 1px solid #1f1f1f;
+}
+
+.arch {
+  padding: 4rem 0 5rem;
+}
+
+.archDiagram {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  background: #0d0d0d;
+  border: 1px solid rgba(229, 71, 43, 0.25);
+  border-radius: 8px;
+  padding: 1rem;
+  color: #e8e8e8;
+  overflow-x: auto;
+}
+
+@media (max-width: 996px) {
+  .archDiagram { margin-top: 2rem; }
+}

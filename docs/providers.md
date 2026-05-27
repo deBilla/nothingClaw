@@ -19,7 +19,7 @@ Writes `agent_provider` to `data/config.json`. Restart isn't required — the ch
 
 ## Claude
 
-Implementation: [src/providers/claude-sdk.ts](../src/providers/claude-sdk.ts).
+Implementation: [src/providers/claude-sdk.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/claude-sdk.ts).
 
 ### How it works
 
@@ -42,7 +42,7 @@ ANTHROPIC_API_KEY=sk-ant-…
 
 ### Tool gate
 
-Every tool call passes through [src/lib/tool-permissions.ts](../src/lib/tool-permissions.ts):
+Every tool call passes through [src/lib/tool-permissions.ts](https://github.com/deBilla/marsclaw/blob/main/src/lib/tool-permissions.ts):
 
 - Filesystem-touching tools (`Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `NotebookEdit`) are restricted to `allowed_paths`.
 - `Bash` adds the destructive-command denylist (`rm -rf /`, `chmod 000`, `dd of=`, fork bombs, `mkfs`, `shred`) plus your `extra_bash_denylist`.
@@ -53,7 +53,7 @@ The same gate hides Claude-Code-UI-only tools (`TodoWrite`, `ScheduleWakeup`, `E
 
 ### Cost tracking
 
-[src/lib/cost-tracker.ts](../src/lib/cost-tracker.ts) sums `SDKResultSuccess.total_cost_usd` per day. New turns refuse once spend exceeds `daily_usd_budget` (config.json). The check is auto-skipped under Claude Pro/Max OAuth — there's no per-token billing.
+[src/lib/cost-tracker.ts](https://github.com/deBilla/marsclaw/blob/main/src/lib/cost-tracker.ts) sums `SDKResultSuccess.total_cost_usd` per day. New turns refuse once spend exceeds `daily_usd_budget` (config.json). The check is auto-skipped under Claude Pro/Max OAuth — there's no per-token billing.
 
 Inspect:
 
@@ -71,11 +71,11 @@ If Claude returns a "hard error" — quota exhausted, auth broken — and Gemini
 [claude] hard error — failing over to gemini
 ```
 
-Hard errors are classified in [src/providers/claude-error.ts](../src/providers/claude-error.ts).
+Hard errors are classified in [src/providers/claude-error.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/claude-error.ts).
 
 ## Gemini
 
-Implementation: [src/providers/gemini-sdk.ts](../src/providers/gemini-sdk.ts).
+Implementation: [src/providers/gemini-sdk.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/gemini-sdk.ts).
 
 ### How it works
 
@@ -105,7 +105,7 @@ Gemini OAuth free tier has a daily quota that resets every 16–24h. When exhaus
 
 > I've hit my daily Gemini quota. Try again later or switch providers (`bun run provider claude`).
 
-Errors are classified in [src/agent.ts](../src/agent.ts) (`geminiFriendlyError`).
+Errors are classified in [src/agent.ts](https://github.com/deBilla/marsclaw/blob/main/src/agent.ts) (`geminiFriendlyError`).
 
 ## Comparison
 

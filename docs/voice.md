@@ -11,7 +11,7 @@ Two Python sidecars on localhost:
 | Whisper  | `faster-whisper`                  | 9000  | `POST /transcribe`                |
 | Kokoro   | `kokoro-onnx` (OpenAI-compatible) | 9001  | `POST /v1/audio/speech`           |
 
-Source: [tools/whisper-server.py](../tools/whisper-server.py), [tools/kokoro-server.py](../tools/kokoro-server.py). Both share one venv under `tools/voice-env/`.
+Source: [tools/whisper-server.py](https://github.com/deBilla/marsclaw/blob/main/tools/whisper-server.py), [tools/kokoro-server.py](https://github.com/deBilla/marsclaw/blob/main/tools/kokoro-server.py). Both share one venv under `tools/voice-env/`.
 
 ## Install
 
@@ -62,13 +62,13 @@ From WhatsApp, send a voice message. You should see:
 
 ### Outbound (TTS)
 
-1. The agent calls the `speak({ text, voice? })` MCP tool. ([src/mcp/speak.ts](../src/mcp/speak.ts))
+1. The agent calls the `speak({ text, voice? })` MCP tool. ([src/mcp/speak.ts](https://github.com/deBilla/marsclaw/blob/main/src/mcp/speak.ts))
 2. The tool POSTs to `http://127.0.0.1:9001/v1/audio/speech` (OpenAI-shaped) with the configured voice.
 3. Writes the returned ogg/opus to `data/voice-out/<id>.ogg`.
 4. Inserts an `outbox` row with `audio_path` set.
 5. The drain loop calls `router.send(threadId, text, { audioPath })`; WhatsApp sends it as a proper voice note (`ptt: true`). On channels without audio support the text is sent instead as fallback.
 
-The persona files ([GEMINI.md](../GEMINI.md), [CLAUDE.md](../CLAUDE.md)) tell the agent to call `speak` whenever the user's message starts with `[Voice]:`, default to voice-only replies in that case, and keep the speech short.
+The persona files ([GEMINI.md](https://github.com/deBilla/marsclaw/blob/main/GEMINI.md), [CLAUDE.md](https://github.com/deBilla/marsclaw/blob/main/CLAUDE.md)) tell the agent to call `speak` whenever the user's message starts with `[Voice]:`, default to voice-only replies in that case, and keep the speech short.
 
 ## Voices
 

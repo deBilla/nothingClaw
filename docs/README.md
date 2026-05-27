@@ -1,10 +1,16 @@
+---
+slug: /
+title: Overview
+sidebar_position: 1
+---
+
 # marsClaw docs
 
 Pick by what you need to do.
 
 ## Get started
 
-→ [../README.md](../README.md) for the elevator pitch and quick-start. Everything else here is reference.
+→ [../README.md](https://github.com/deBilla/marsclaw/blob/main/README.md) for the elevator pitch and quick-start. Everything else here is reference.
 
 ## Understand the system
 

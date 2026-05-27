@@ -127,11 +127,11 @@ bun test             # all tests; LOG_LEVEL=error to suppress noise
 bun test --watch
 ```
 
-A husky pre-commit hook runs Prettier + ESLint; CI lives in [.github/workflows/](../.github/workflows/).
+A husky pre-commit hook runs Prettier + ESLint; CI lives in [.github/workflows/](https://github.com/deBilla/marsclaw/blob/main/.github/workflows/).
 
 ## Tests
 
-In [tests/](../tests/). Notable ones:
+In [tests/](https://github.com/deBilla/marsclaw/blob/main/tests/). Notable ones:
 
 | File | What it covers |
 |---|---|
@@ -148,25 +148,25 @@ In [tests/](../tests/). Notable ones:
 
 ## Adding a channel
 
-1. Add a file under [src/channels/](../src/channels/) that exports `create<Name>Channel({ ..., onMessage }): Channel`.
+1. Add a file under [src/channels/](https://github.com/deBilla/marsclaw/blob/main/src/channels/) that exports `create<Name>Channel({ ..., onMessage }): Channel`.
 2. Use `<name>:<upstream-id>` for thread IDs — the router dispatches outbound sends back to you by that prefix.
-3. Wire it up in [src/index.ts](../src/index.ts) behind a feature flag (env var or `data/config.json` field).
+3. Wire it up in [src/index.ts](https://github.com/deBilla/marsclaw/blob/main/src/index.ts) behind a feature flag (env var or `data/config.json` field).
 4. Implement `setTyping` if the upstream supports it. Channels without it get a no-op.
 
 `SendOpts` supports `audioPath` (voice notes) and `filePath` + `fileName` (file delivery). Implement what your channel can render; the rest is sent as plain text.
 
 ## Adding an MCP tool
 
-1. Add a file in [src/mcp/](../src/mcp/) exporting `{ definition, handler }` shaped like the existing tools.
-2. Register it in [src/mcp/server.ts](../src/mcp/server.ts) — add to the `tools` array.
-3. If your tool writes to the outbox, follow [send_file.ts](../src/mcp/send_file.ts) — load `MARSCLAW_THREAD_ID` from env, validate paths against `loadConfig().allowed_paths`.
-4. If your tool calls a Google API, get an authed client via [src/google/clients.ts](../src/google/clients.ts).
+1. Add a file in [src/mcp/](https://github.com/deBilla/marsclaw/blob/main/src/mcp/) exporting `{ definition, handler }` shaped like the existing tools.
+2. Register it in [src/mcp/server.ts](https://github.com/deBilla/marsclaw/blob/main/src/mcp/server.ts) — add to the `tools` array.
+3. If your tool writes to the outbox, follow [send_file.ts](https://github.com/deBilla/marsclaw/blob/main/src/mcp/send_file.ts) — load `MARSCLAW_THREAD_ID` from env, validate paths against `loadConfig().allowed_paths`.
+4. If your tool calls a Google API, get an authed client via [src/google/clients.ts](https://github.com/deBilla/marsclaw/blob/main/src/google/clients.ts).
 
 Restart the bot. The agent will discover the new tool via the standard MCP list-tools handshake.
 
 ## Adding a provider
 
-1. Add a file in [src/providers/](../src/providers/) that exports a `Provider` per [src/providers/types.ts](../src/providers/types.ts):
+1. Add a file in [src/providers/](https://github.com/deBilla/marsclaw/blob/main/src/providers/) that exports a `Provider` per [src/providers/types.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/types.ts):
 
    ```ts
    export const myprovider: Provider = {
@@ -179,21 +179,21 @@ Restart the bot. The agent will discover the new tool via the standard MCP list-
    ```
 
 2. Add a `run<Provider>Sdk(...)` if your provider is an SDK (preferred — avoids subprocess cold-start).
-3. Wire both into [src/providers/registry.ts](../src/providers/registry.ts) and the `agent_provider` union in [src/lib/config.ts](../src/lib/config.ts).
-4. Add a branch in [src/agent.ts](../src/agent.ts) and a friendly-error mapper if your provider has rate-limit quirks.
+3. Wire both into [src/providers/registry.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/registry.ts) and the `agent_provider` union in [src/lib/config.ts](https://github.com/deBilla/marsclaw/blob/main/src/lib/config.ts).
+4. Add a branch in [src/agent.ts](https://github.com/deBilla/marsclaw/blob/main/src/agent.ts) and a friendly-error mapper if your provider has rate-limit quirks.
 
 ## Personas
 
 Two files, identical purpose, kept separately because the upstream SDKs read different filenames:
 
-- [GEMINI.md](../GEMINI.md) — read by `@google/gemini-cli-core`
-- [CLAUDE.md](../CLAUDE.md) — read by `@anthropic-ai/claude-agent-sdk`
+- [GEMINI.md](https://github.com/deBilla/marsclaw/blob/main/GEMINI.md) — read by `@google/gemini-cli-core`
+- [CLAUDE.md](https://github.com/deBilla/marsclaw/blob/main/CLAUDE.md) — read by `@anthropic-ai/claude-agent-sdk`
 
 Setup keeps them in sync. If you tweak one, mirror to the other.
 
 ## Migrations
 
-Drop a new file in [migrations/](../migrations/) with the next sequential number (`0005_…sql`). It runs on the next boot via [src/db/migrations.ts](../src/db/migrations.ts), which uses `user_version` as the cursor. Migrations are append-only; once shipped, never edit a previous file — write a new one.
+Drop a new file in [migrations/](https://github.com/deBilla/marsclaw/blob/main/migrations/) with the next sequential number (`0005_…sql`). It runs on the next boot via [src/db/migrations.ts](https://github.com/deBilla/marsclaw/blob/main/src/db/migrations.ts), which uses `user_version` as the cursor. Migrations are append-only; once shipped, never edit a previous file — write a new one.
 
 ## Style
 

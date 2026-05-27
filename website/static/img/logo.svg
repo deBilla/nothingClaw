@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="marsClaw logo">
+  <defs>
+    <radialGradient id="mars" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#d04827"/>
+      <stop offset="60%" stop-color="#b73729"/>
+      <stop offset="100%" stop-color="#7a2417"/>
+    </radialGradient>
+    <linearGradient id="clawFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6e54"/>
+      <stop offset="55%" stop-color="#e5472b"/>
+      <stop offset="100%" stop-color="#9e2f18"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mars sphere -->
+  <circle cx="100" cy="105" r="48" fill="url(#mars)"/>
+  <!-- Craters -->
+  <circle cx="82"  cy="92"  r="5"   fill="#7a2417" opacity="0.55"/>
+  <circle cx="116" cy="100" r="3.5" fill="#7a2417" opacity="0.55"/>
+  <circle cx="98"  cy="125" r="4"   fill="#7a2417" opacity="0.55"/>
+  <circle cx="124" cy="120" r="2.5" fill="#7a2417" opacity="0.55"/>
+  <circle cx="76"  cy="115" r="2.5" fill="#7a2417" opacity="0.55"/>
+
+  <!-- Outer claws curling inward from the top.
+       Two large pincers, symmetrical about the y-axis. -->
+  <!-- Left outer claw -->
+  <path d="M 100 28
+           C 78 30, 50 50, 38 86
+           C 32 108, 38 132, 50 152
+           C 56 140, 62 132, 72 126
+           C 60 110, 58 90, 70 72
+           C 80 58, 92 50, 102 50
+           Z"
+        fill="url(#clawFill)"/>
+  <!-- Right outer claw -->
+  <path d="M 100 28
+           C 122 30, 150 50, 162 86
+           C 168 108, 162 132, 150 152
+           C 144 140, 138 132, 128 126
+           C 140 110, 142 90, 130 72
+           C 120 58, 108 50, 98 50
+           Z"
+        fill="url(#clawFill)"/>
+
+  <!-- Inner claws (the small inward-pointing talons) -->
+  <path d="M 78 96
+           C 75 88, 78 80, 86 76
+           L 96 96
+           C 92 100, 84 102, 78 96 Z"
+        fill="url(#clawFill)"/>
+  <path d="M 122 96
+           C 125 88, 122 80, 114 76
+           L 104 96
+           C 108 100, 116 102, 122 96 Z"
+        fill="url(#clawFill)"/>
+</svg>
