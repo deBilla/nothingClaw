@@ -35,7 +35,14 @@ export interface AuditRecord {
   /** Short, redacted hint at what the tool was asked to do (URL, command preview, file_path). */
   subject?: string;
   /** Layer that made the decision: built-in permission gate, mutation gate, etc. */
-  layer?: 'canUseTool' | 'mutation-gate' | 'sensitive-paths' | 'url-allowlist' | 'shell-disabled' | 'web-disabled';
+  layer?:
+    | 'canUseTool'
+    | 'mutation-gate'
+    | 'sensitive-paths'
+    | 'url-allowlist'
+    | 'shell-disabled'
+    | 'web-disabled'
+    | 'egress-gateway';
 }
 
 // Path is resolved lazily so the env var can be set before each call. Each
@@ -71,6 +78,75 @@ export function audit(rec: AuditRecord): void {
     void err;
     process.stderr.write(`[audit] write failed: ${(err as Error)?.message ?? err}\n`);
   }
+  if (rec.decision === 'deny' || rec.decision === 'blocked') {
+    noteDenial(rec);
+  }
+}
+
+// --- Density-based denial alerting ----------------------------------------
+//
+// A real prompt-injection attempt typically triggers a *burst* of denials in
+// rapid succession (try to read .env, try to send to attacker.com, try a
+// different domain, try shell, …) before the model gives up. The forensic
+// audit log catches every one, but the operator only sees it after grepping.
+//
+// We add a sliding-window counter: when ≥THRESHOLD denials happen within
+// WINDOW_MS, fire a single alert via the registered alerter, and suppress
+// further alerts for COOLDOWN_MS so a sustained injection doesn't flood the
+// channel.
+//
+// The alerter is registered from `cli/index.ts start` once the channel router
+// is up, so the alert lands in the operator's chat thread (or stderr if no
+// channel is registered). The audit module deliberately does NOT import the
+// channel router — that would create a dep cycle and make audit useless
+// during boot. Keep this module purely passive.
+
+interface DenialEvent {
+  ts: number;
+  rec: AuditRecord;
+}
+
+const ALERT_WINDOW_MS = 60_000;
+const ALERT_THRESHOLD = 5;
+const ALERT_COOLDOWN_MS = 5 * 60_000;
+
+const recentDenials: DenialEvent[] = [];
+let lastAlertAt = 0;
+
+type Alerter = (summary: string, sample: AuditRecord[]) => void;
+let alerter: Alerter | null = null;
+
+/** Register a runtime alerter for denial-density events (called from cli/index). */
+export function registerAuditAlerter(fn: Alerter | null): void {
+  alerter = fn;
+}
+
+function noteDenial(rec: AuditRecord): void {
+  const now = Date.now();
+  recentDenials.push({ ts: now, rec });
+  // Drop events older than the window.
+  const cutoff = now - ALERT_WINDOW_MS;
+  while (recentDenials.length > 0 && recentDenials[0]!.ts < cutoff) recentDenials.shift();
+  if (recentDenials.length < ALERT_THRESHOLD) return;
+  if (now - lastAlertAt < ALERT_COOLDOWN_MS) return;
+  lastAlertAt = now;
+  const sample = recentDenials.slice(-ALERT_THRESHOLD).map((d) => d.rec);
+  const tools = [...new Set(sample.map((r) => r.tool))].join(', ');
+  const summary =
+    `⚠️ marsClaw: ${recentDenials.length} tool denials in ${Math.round(ALERT_WINDOW_MS / 1000)}s` +
+    ` — possible prompt injection. Tools: ${tools}. See logs/audit.log.`;
+  try {
+    if (alerter) alerter(summary, sample);
+    else process.stderr.write(`[audit] ${summary}\n`);
+  } catch (err) {
+    process.stderr.write(`[audit] alerter threw: ${(err as Error)?.message ?? err}\n`);
+  }
+}
+
+/** Test-only — clear the in-memory denial counter so tests are deterministic. */
+export function _resetAuditAlertStateForTests(): void {
+  recentDenials.length = 0;
+  lastAlertAt = 0;
 }
 
 /** Read-side helper used by tests; trivial enough to inline. */

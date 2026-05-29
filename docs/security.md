@@ -4,6 +4,12 @@ This is the canonical security doc for marsClaw. It states the **threat model**,
 
 Short read: marsClaw is a single-process, single-user personal bot. The defensive principle is **"can't prevent injection, so shrink blast radius and log everything"** — the agent is structurally egress-less by default, can only act through a narrow validated surface, and every attempt lands in an append-only audit log.
 
+There are now **two layers** to that principle, and they compose:
+1. **Input restriction** (the original layer): capability flags, the URL allow-list, sensitive-path denials. Cheap, cross-platform, on by default. Costs some capability (the agent can't read off-allow-list pages).
+2. **Blast-radius containment** (the NemoClaw-style layer, opt-in): an SSRF-protected egress gateway, LLM-credential isolation, a kernel sandbox, and per-call mutation approval. These shrink what a *hijacked* agent can *do* rather than what it can *read* — so turning them on lets you *relax* the input restrictions (open the URL allow-list, enable WebSearch fully) without losing security. See [vs-nanoclaw.md](vs-nanoclaw.md) for where this lands relative to the containerized cousin.
+
+The containment layer is **off by default** and platform-dependent — read "The honest platform constraint" below before relying on it.
+
 ## The threat we defend against
 
 A **prompt-injected agent**. The bot routinely reads attacker-influenceable text — email bodies via Gmail tools, web pages via WebFetch, search snippets, even chat messages from anyone allowed to message the bot. Any of that content can carry "ignore previous instructions, do X" payloads. We design as though every turn could be hostile.
@@ -157,7 +163,36 @@ The thing asking for approval is the *potentially-compromised* agent. A hijacked
 
 Instead, when something is blocked, the audit log records it and the agent tells the user the precise `data/config.json` edit + restart needed. Permission changes flow through the operator on a real keyboard, not through a chat reply. That sacrifices polish for a meaningful security property.
 
-## Configuration cheatsheet — three postures
+## Blast-radius containment (the NemoClaw-style layer)
+
+All opt-in. Each shrinks what a compromised agent can *do*, independent of what it reads.
+
+### Egress gateway — `tools/egress-gateway/`
+
+An SSRF-protected forward proxy ([gateway.ts](https://github.com/deBilla/marsclaw/blob/main/tools/egress-gateway/gateway.ts)). HTTPS via CONNECT tunnel, plain HTTP via absolute→origin rewrite. It resolves every target host and refuses to connect if any resolved IP is loopback, RFC1918, CGNAT, link-local (incl. `169.254.169.254` cloud metadata), or multicast/reserved — resolving once and pinning the IP to kill DNS-rebinding. The classifier ([ssrf.ts](https://github.com/deBilla/marsclaw/blob/main/tools/egress-gateway/ssrf.ts)) fails closed. Every decision is audited.
+
+When `egress_mode: "gateway"` **and** egress is actually enforced (see platform constraint), the per-host URL allow-list is bypassed — the gateway is the boundary instead. Loopback / non-`http(s)` URLs are still rejected at the gate.
+
+### LLM credential isolation — `tools/llm-proxy/`
+
+The agent subprocess is launched with a curated env ([claude-sdk.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/claude-sdk.ts) `agentSubprocessEnv`) when `MARSCLAW_LLM_PROXY_URL` + `MARSCLAW_LLM_PROXY_TOKEN` are set: the real `ANTHROPIC_API_KEY`/`CLAUDE_CODE_OAUTH_TOKEN` are stripped and replaced with a rotatable session token pointed at the local proxy. A prompt-injected agent running `Bash("env")` finds only the session token, useless anywhere but the proxy. The proxy holds the real credential and forwards only `/v1/messages|models|complete`.
+
+### Kernel sandbox — `tools/sandbox/`
+
+- **macOS**: `marsclaw.sb` — a deny-default `sandbox-exec` profile. Credential paths (`.env`, `~/.claude.json`, `~/.gemini`, Keychain, `~/.ssh`) are denied at the kernel, so `allow_shell=true` no longer means "shell can `cat .env`".
+- **Linux**: `run-linux.sh` — bubblewrap with tmpfs `$HOME` (credentials don't exist in the namespace), read-only system + source, dropped caps; `seccomp.json` denies `ptrace`/`mount`/`setns`/`bpf`/… .
+
+### Per-call mutation approval — `mutation_approval: "all"`
+
+Every mutating tool ([mutation-gate.ts](https://github.com/deBilla/marsclaw/blob/main/src/lib/mutation-gate.ts)) blocks and the **broker** (not the agent) sends the operator a structured prompt rendered from the tool's real parameters, plus a random nonce ([approval-gate.ts](https://github.com/deBilla/marsclaw/blob/main/src/lib/approval-gate.ts)). The operator replies the nonce; it's intercepted in the main-process dispatcher *before* the agent loop, so the agent can neither author the prompt, generate the nonce, nor see the reply. This is the chat-native form of operator approval — it sidesteps the "injected agent composes a persuasive approval message" failure of naive tap-yes-in-chat because the rendering is done by trusted code from structured fields.
+
+## The honest platform constraint
+
+"All traffic must traverse the gateway" is a **kernel** property:
+- **Linux** — a network namespace whose only route is the gateway makes it airtight. (Scaffolded in `run-linux.sh`; validate on a real Linux host before relying on it.)
+- **macOS** — no netns. Enforcement is the `pf` packet-filter anchor (`tools/sandbox/pf-anchor.conf`), which drops outbound from the bot's user except to the gateway + DNS. Proxy env vars are only a hint (Node's fetch ignores them). **Therefore the URL allow-list is relaxed only when `MARSCLAW_EGRESS_ENFORCED=1`** — an operator assertion you set *after* installing and verifying the pf anchor. Without it, the allow-list stays the boundary (fail-safe).
+
+## Configuration cheatsheet — postures
 
 ### Locked down (default after fresh install)
 Everything off. No third-party egress at all. The bot can still read your Gmail/Drive/Calendar, summarise content for you, run the assistant loop — it just can't act outwardly.
@@ -192,16 +227,32 @@ Mutations on too — the bot can send email, write Sheets, create calendar event
 }
 ```
 
+### Contained (NemoClaw-style — maximum capability, contained blast radius)
+The point of the containment layer: open the inputs *because* the consequences are contained. Web wide open, mutations gated per-call instead of all-or-nothing, egress forced through the SSRF gateway, credentials isolated, agent sandboxed.
+
+```jsonc
+// data/config.json
+{
+  "allow_web": true,
+  "allowed_web_domains": [],          // relaxed: the gateway is the boundary
+  "egress_mode": "gateway",
+  "mutation_approval": "all"          // per-call approval supersedes allow_mutating_tools
+}
+```
+
+Then run hardened (`bun run service install --hardened`) with `EGRESS_GATEWAY=1`, `LLM_PROXY=1`, `SANDBOX=1`, and — on macOS, after `sudo tools/sandbox/install-pf-anchor.sh` — `MARSCLAW_EGRESS_ENFORCED=1`. With egress contained you can even consider `allow_shell: true`, since the sandbox denies the credential paths shell would otherwise reach.
+
 ## Residual risks (honest list)
 
 In rough order of how much they matter:
 
-1. **Supply chain** — the SDK and every dep run in-process as you. No in-process flag fixes this.
-2. **Enabling `allow_shell` reopens the file/credential exfil class.** A denylist cannot make shell safe; this is by design.
-3. **Indirect prompt injection in untrusted content** — the researcher subagent and capability-removal mitigate, but a sufficiently clever poisoned summary can still influence the executive's reply.
-4. **Audit log is local-only.** A host-compromised attacker can rewrite it. Ship to a remote sink if you need real tamper-evidence.
-5. **The model provider sees your context.** Inherent.
-6. **`MARSCLAW_TOOL_PERMISSIONS=bypass` disables every gate.** Operator escape hatch; never set it in a running deployment.
+1. **Supply chain** — the SDK and every dep run in-process as you. The `bun.lock` file is the only line of defence between an audited dependency closure and a fresh install; the install path (`setup.sh`) is hardened to use `--frozen-lockfile`, a pinned bun version (`BUN_VERSION`), and a SHA-256-verified nvm installer, but a compromise of any leaf in the closure still runs as you.
+2. **`yt-dlp` is a security boundary**, not a trusted dependency. It runs as the bot's user and parses attacker-influenced YouTube payloads (a YouTube link the user forwarded). Setup pins it to a validated version (`YTDLP_PIN` in `src/cli/setup.ts`); bump deliberately.
+3. **Enabling `allow_shell` reopens the file/credential exfil class.** A denylist cannot make shell safe; this is by design. Pair `allow_shell=true` with the `tools/sandbox/` wrapper and the `tools/llm-proxy/` sidecar for a defensible posture.
+4. **Indirect prompt injection in untrusted content** — the researcher subagent and capability-removal mitigate, but a sufficiently clever poisoned summary can still influence the executive's reply. The audit-density alerter (5 denials in 60s → out-of-band ping via WhatsApp/Telegram) provides a fast operator-facing signal when an injection burst is in flight.
+5. **Audit log is local-only.** A host-compromised attacker can rewrite it. Ship to a remote sink if you need real tamper-evidence.
+6. **The model provider sees your context.** Inherent.
+7. **No global bypass toggle.** A previous `MARSCLAW_TOOL_PERMISSIONS=bypass` escape hatch was removed — a setting whose only effect is "disable every gate" is a foot-gun (a forgotten debug toggle silently turns the bot into a credential-exfil channel). Setting that env var now logs a warning and is otherwise ignored. To loosen behaviour for a specific case, edit `data/config.json` directly.
 
 ## Where the code lives
 
@@ -215,5 +266,10 @@ In rough order of how much they matter:
 | Researcher subagent + persona | [src/providers/claude-sdk.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/claude-sdk.ts) |
 | Telegram / Slack sender allow-lists | [src/channels/telegram.ts](https://github.com/deBilla/marsclaw/blob/main/src/channels/telegram.ts), [src/channels/slack.ts](https://github.com/deBilla/marsclaw/blob/main/src/channels/slack.ts) |
 | MCP child env passthrough (no Anthropic creds in broker) | [src/providers/claude-sdk.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/claude-sdk.ts) `MCP_ENV_PASSTHROUGH` |
+| Egress gateway + SSRF classifier | [tools/egress-gateway/gateway.ts](https://github.com/deBilla/marsclaw/blob/main/tools/egress-gateway/gateway.ts), [ssrf.ts](https://github.com/deBilla/marsclaw/blob/main/tools/egress-gateway/ssrf.ts) |
+| LLM credential isolation (curated subprocess env) | [src/providers/claude-sdk.ts](https://github.com/deBilla/marsclaw/blob/main/src/providers/claude-sdk.ts) `agentSubprocessEnv`, [tools/llm-proxy/proxy.ts](https://github.com/deBilla/marsclaw/blob/main/tools/llm-proxy/proxy.ts) |
+| Per-call mutation approval | [src/lib/approval-gate.ts](https://github.com/deBilla/marsclaw/blob/main/src/lib/approval-gate.ts), [src/db/approvals.ts](https://github.com/deBilla/marsclaw/blob/main/src/db/approvals.ts), interception in [src/index.ts](https://github.com/deBilla/marsclaw/blob/main/src/index.ts) |
+| Kernel sandbox + egress enforcement | [tools/sandbox/](https://github.com/deBilla/marsclaw/blob/main/tools/sandbox/) (`marsclaw.sb`, `run-*.sh`, `pf-anchor.conf`, `seccomp.json`, `launch-hardened.sh`) |
+| Audit-density alerting | [src/lib/audit-log.ts](https://github.com/deBilla/marsclaw/blob/main/src/lib/audit-log.ts) `registerAuditAlerter` |
 
 For the comparison against the multi-tenant alternative — when in-process is enough vs. when you need a container — see [vs-nanoclaw.md](vs-nanoclaw.md).

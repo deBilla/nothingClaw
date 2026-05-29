@@ -8,8 +8,12 @@
 // 2. Bash gets an additional destructive-command blocklist. Standard rules:
 //      rm -rf /, chmod 000, dd of=, plus user-extendable config.extra_bash_denylist.
 //
-// Escape hatch: MARSCLAW_TOOL_PERMISSIONS=bypass restores pre-hardening
-// behaviour (everything allowed). One-release migration aid; remove next.
+// There is no global bypass env var. A previous migration-aid escape hatch
+// (`MARSCLAW_TOOL_PERMISSIONS=bypass`) was removed: a setting whose only effect
+// is "disable every gate" is a foot-gun in a running deployment — a forgotten
+// debug toggle silently turns the bot into a credential-exfil channel. To
+// loosen behaviour for a specific case, edit data/config.json directly so the
+// change is visible and reviewable.
 
 import path from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -17,7 +21,7 @@ import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sd
 import { log } from './log.ts';
 import { isSensitivePath, pathContainsSensitive } from './sensitive-paths.ts';
 import { audit } from './audit-log.ts';
-import { urlAllowed } from './url-allowlist.ts';
+import { urlAllowed, urlHost } from './url-allowlist.ts';
 import type { MarsclawConfig } from './config.ts';
 
 const FS_TOOLS = new Set(['Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'NotebookEdit']);
@@ -90,11 +94,12 @@ function extractPaths(input: Record<string, unknown>): string[] {
 
 export function buildCanUseTool(config: MarsclawConfig): CanUseTool {
   if (process.env.MARSCLAW_TOOL_PERMISSIONS === 'bypass') {
-    log.warn('MARSCLAW_TOOL_PERMISSIONS=bypass — agent has unrestricted tool access (escape hatch)');
-    return async (toolName, input) => {
-      audit({ tool: toolName, decision: 'allow', layer: 'canUseTool', reason: 'bypass-escape-hatch' });
-      return allowResult(input);
-    };
+    // Refuse to silently honour the legacy bypass var. Log loud and continue
+    // with the real gate; the operator gets a one-time signal and the bot
+    // doesn't quietly run unprotected.
+    log.warn(
+      'MARSCLAW_TOOL_PERMISSIONS=bypass is set but no longer honoured — unset it. The tool gate is always on.',
+    );
   }
 
   const allowedPaths = config.allowed_paths.map((p) => path.resolve(p));
@@ -200,8 +205,7 @@ export function buildCanUseTool(config: MarsclawConfig): CanUseTool {
           });
           return denyResult(
             `Path ${t} is outside the allowed_paths. Add "${path.resolve(t)}" to ` +
-              `data/config.json allowed_paths to grant access, or restart with ` +
-              `MARSCLAW_TOOL_PERMISSIONS=bypass for a one-off override.`,
+              `data/config.json allowed_paths to grant access (no env override exists).`,
           );
         }
       }
@@ -270,7 +274,21 @@ export function buildCanUseTool(config: MarsclawConfig): CanUseTool {
       // — that's the exfil vector the allow-list closes.
       if (toolName === 'WebFetch') {
         const url = typeof input.url === 'string' ? input.url : '';
-        if (!urlAllowed(url, config.allowed_web_domains)) {
+        // When egress is routed through the gateway AND that routing is
+        // actually enforced (the launch wrapper asserts MARSCLAW_EGRESS_ENFORCED
+        // after establishing netns/pf), the SSRF-protected gateway is the
+        // boundary and the per-host allow-list is bypassed. We still reject
+        // non-http(s) and loopback URLs here — those are never legitimate and
+        // failing at the gate is clearer than failing at the proxy.
+        const egressEnforced =
+          config.egress_mode === 'gateway' && process.env.MARSCLAW_EGRESS_ENFORCED === '1';
+        if (egressEnforced) {
+          if (urlHost(url) === null) {
+            audit({ tool: 'WebFetch', decision: 'deny', layer: 'egress-gateway', subject: url.slice(0, 200), reason: 'non-http(s) or loopback url' });
+            return denyResult(`Fetch denied: ${url} is not a valid remote http(s) URL.`);
+          }
+          audit({ tool: 'WebFetch', decision: 'allow', layer: 'egress-gateway', subject: url.slice(0, 200), reason: 'gateway-enforced' });
+        } else if (!urlAllowed(url, config.allowed_web_domains)) {
           log.warn('tool denied: WebFetch url not on allow-list', {
             url,
             allowlist: config.allowed_web_domains,
@@ -288,8 +306,9 @@ export function buildCanUseTool(config: MarsclawConfig): CanUseTool {
               `To grant access the operator must add the domain to "allowed_web_domains" in ` +
               `data/config.json and restart.`,
           );
+        } else {
+          audit({ tool: 'WebFetch', decision: 'allow', layer: 'url-allowlist', subject: url.slice(0, 200) });
         }
-        audit({ tool: 'WebFetch', decision: 'allow', layer: 'url-allowlist', subject: url.slice(0, 200) });
       } else {
         audit({ tool: toolName, decision: 'allow', layer: 'canUseTool' });
       }

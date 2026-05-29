@@ -1,7 +1,8 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { createReadStream, mkdirSync } from 'node:fs';
+import { createReadStream, mkdirSync, statSync, unlinkSync } from 'node:fs';
 import { loadConfig } from '../lib/config.ts';
 import { log } from '../lib/log.ts';
+import { RateLimiter } from '../lib/rate-limit.ts';
 import { transcribe } from '../voice.ts';
 import type { Channel, ChannelInit, SendOpts } from './types.ts';
 
@@ -12,15 +13,32 @@ export interface TelegramOptions extends ChannelInit {
 const PREFIX = 'telegram:';
 const TG_MAX = 4000;
 const MEDIA_DIR = process.env.MARSCLAW_TELEGRAM_MEDIA ?? 'data/telegram-media';
+// Hard cap on downloaded media size. Telegram itself caps voice notes at
+// ~20 MB and audio files at 50 MB; we set our own ceiling so a hostile sender
+// (combined with no rate limit before this point) can't drive a disk-fill.
+// Anything over this is unlinked immediately after download.
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
 export function createTelegramChannel(opts: TelegramOptions): Channel {
   const bot = new TelegramBot(opts.token, { polling: true });
 
   // Sender allow-list. Non-empty = reject anyone not listed. Empty = accept
   // all, warning once per new chat id so the owner can lock it down.
-  const allowed = new Set(loadConfig().allowed_telegram_chats.map((c) => String(c).trim()).filter(Boolean));
+  const config = loadConfig();
+  const allowed = new Set(config.allowed_telegram_chats.map((c) => String(c).trim()).filter(Boolean));
   const warnedOpen = new Set<string>();
-  const voiceEnabled = loadConfig().voice_enabled;
+  const voiceEnabled = config.voice_enabled;
+  // Per-sender rate limit. Telegram bots are discoverable by handle, so
+  // without this anyone who finds the bot can DOS-bill the agent loop or
+  // tie up the local whisper transcriber with garbage. Defaults are the
+  // same as WhatsApp (10/min, 60/hr); 0 disables either band.
+  const limiter =
+    config.rate_limit_per_minute > 0 || config.rate_limit_per_hour > 0
+      ? new RateLimiter({
+          perMinute: config.rate_limit_per_minute || Infinity,
+          perHour: config.rate_limit_per_hour || Infinity,
+        })
+      : null;
 
   bot.on('message', async (msg) => {
     // Accept text, voice notes (msg.voice), and audio files (msg.audio).
@@ -44,6 +62,17 @@ export function createTelegramChannel(opts: TelegramOptions): Channel {
       });
     }
 
+    // Per-sender rate limit. Silently drop excess so we don't turn a flood
+    // into a flood of "you're rate-limited" replies (which would themselves
+    // cost an outbound API call per message).
+    if (limiter) {
+      const verdict = limiter.check(chatId);
+      if (!verdict.ok) {
+        log.warn('telegram rate-limited', { chatId, reason: verdict.reason, retryAfterMs: verdict.retryAfterMs });
+        return;
+      }
+    }
+
     // Transcribe voice/audio if present and voice support is enabled.
     let voiceText = '';
     if (voiceFileId) {
@@ -54,6 +83,19 @@ export function createTelegramChannel(opts: TelegramOptions): Channel {
           mkdirSync(MEDIA_DIR, { recursive: true });
           const t0 = Date.now();
           const filePath = await bot.downloadFile(voiceFileId, MEDIA_DIR);
+          // Enforce a hard size cap AFTER download (the Bot API doesn't
+          // surface size before fetch). Anything over the cap is unlinked
+          // and the message proceeds as a transcription failure.
+          try {
+            const sz = statSync(filePath).size;
+            if (sz > MAX_MEDIA_BYTES) {
+              try { unlinkSync(filePath); } catch (err) { void err; }
+              throw new Error(`media exceeds size cap (${sz} bytes > ${MAX_MEDIA_BYTES})`);
+            }
+          } catch (err) {
+            log.warn('telegram media size check failed', { chatId, err });
+            throw err;
+          }
           voiceText = await transcribe(filePath);
           const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
           log.info('telegram transcribed audio', { chatId, elapsed, preview: voiceText.slice(0, 80) });

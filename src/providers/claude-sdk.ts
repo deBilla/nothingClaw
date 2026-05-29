@@ -142,6 +142,43 @@ function buildMcpChildEnv(threadId: string): Record<string, string> {
   return env;
 }
 
+// Credential isolation for the agent subprocess (Phase C of the NemoClaw
+// hardening). When the local LLM proxy is configured, the Claude Code
+// subprocess is launched with a CURATED env: the real Anthropic credential is
+// stripped and replaced with a session token pointed at the proxy. The proxy
+// (a separate process) holds the real key and swaps it back in.
+//
+// The point: a prompt-injected agent that runs `Bash("env")` or reads its own
+// process environment finds only the session token, which is useless anywhere
+// but the local proxy and rotatable independently. The real key never enters
+// the subprocess the model can drive.
+//
+// Returns undefined when the proxy isn't configured — the SDK then inherits
+// process.env exactly as before, so the default path is unchanged.
+//
+// NOTE: `options.env` REPLACES the subprocess env entirely (per the SDK
+// contract), so we spread process.env and then redact + override.
+function agentSubprocessEnv(): Record<string, string | undefined> | undefined {
+  const proxyUrl = process.env.MARSCLAW_LLM_PROXY_URL;
+  const token = process.env.MARSCLAW_LLM_PROXY_TOKEN;
+  if (!proxyUrl || !token) return undefined;
+  const env: Record<string, string | undefined> = { ...process.env };
+  // Strip the real credentials — the subprocess must not be able to read them.
+  delete env.ANTHROPIC_API_KEY;
+  delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  // Point the SDK at the local proxy with the rotatable session token.
+  env.ANTHROPIC_BASE_URL = proxyUrl;
+  env.ANTHROPIC_API_KEY = token;
+  return env;
+}
+
+const AGENT_SUBPROCESS_ENV = agentSubprocessEnv();
+if (AGENT_SUBPROCESS_ENV) {
+  log.info('claude SDK credential isolation active — agent subprocess routed through LLM proxy', {
+    proxy: process.env.MARSCLAW_LLM_PROXY_URL,
+  });
+}
+
 function mcpServers(threadId: string): Record<string, McpServerConfig> {
   return {
     marsclaw: {
@@ -234,6 +271,9 @@ class ClaudeSession {
         disallowedTools: SESSION_DISALLOWED_TOOLS,
         agents: { researcher: RESEARCHER_AGENT },
         mcpServers: mcpServers(threadId),
+        // Curated subprocess env (credential isolation) when the LLM proxy is
+        // configured; undefined → inherit process.env (default, unchanged).
+        env: AGENT_SUBPROCESS_ENV,
       },
     });
     void this.consume();

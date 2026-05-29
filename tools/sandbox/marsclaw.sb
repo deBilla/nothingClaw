@@ -1,84 +1,93 @@
-;; marsClaw macOS sandbox profile — STUB.
+;; marsClaw macOS sandbox profile — deny-default.
 ;;
-;; sandbox-exec is the legacy macOS interface to the kernel-level Sandbox
-;; (formerly seatbelt). It is undocumented and Apple has marked it deprecated,
-;; but it still works on current macOS and is the only way to get TrustedBSD-MAC
-;; FS containment without writing a System Extension. Treat this file as defence
-;; in depth on top of the in-process gates — not as a replacement for them.
+;; sandbox-exec is the legacy interface to the macOS Sandbox (TrustedBSD-MAC).
+;; Undocumented and deprecated by Apple, but still functional and the only way
+;; to get kernel-enforced containment without a System Extension.
 ;;
-;; The profile is intentionally permissive on syscalls and network, and tight
-;; on filesystem. The credential exfil path (read .env / ~/.claude.json /
-;; data/secrets/) is what we cut here. Closing network requires either an
-;; outbound-only block list (see deny network-outbound section near the end)
-;; or pairing this with the local llm-proxy sidecar.
+;; This profile is DENY-DEFAULT: anything not explicitly allowed is refused by
+;; the kernel. That's stricter than the previous (allow default) stub — but a
+;; Bun+Node process touches many operation classes, so EXPECT to add allows on
+;; first runs. How to iterate:
+;;   1. Run the bot under this profile (tools/sandbox/run-macos.sh).
+;;   2. Watch Console.app (or `log stream --predicate 'sender == "Sandbox"'`)
+;;      for "deny" lines naming the operation + target.
+;;   3. Add a matching (allow …) below, restart, repeat until it boots clean.
 ;;
-;; Usage:
-;;   tools/sandbox/run-macos.sh              # start the bot under this profile
-;;   sandbox-exec -f tools/sandbox/marsclaw.sb -D PROJECT=$PWD -D HOME=$HOME \
-;;                bun run src/cli/index.ts start
+;; The security-critical rules are the credential DENIES near the end and the
+;; (optional) loopback-only network block — those survive no matter how many
+;; allows you add above them, because later matching rules win in SBPL.
+;;
+;; Usage: sandbox-exec -f marsclaw.sb -D PROJECT=$PWD -D HOME=$HOME bun run src/cli/index.ts start
 
 (version 1)
+(deny default)
 
-;; Default-allow on most operations; we only deny specific high-value targets.
-;; A default-deny profile is feasible but requires enumerating every mach-lookup
-;; and IOKit class the SDK touches — that's a separate hardening pass.
-(allow default)
+;; Allow the kernel to tell us WHY something was denied (shows targets in logs).
+(allow file-read-metadata)
 
-;; --- The exfiltration class we actually want to close ----------------------
+;; --- Process / exec --------------------------------------------------------
+(allow process-fork)
+(allow process-exec)
+(allow signal (target self))
 
-;; .env — channel tokens, OAuth client secrets, ANTHROPIC_API_KEY if not OAuth.
+;; --- Filesystem reads ------------------------------------------------------
+;; Broad read. A SCOPED read list is a trap here: the dynamic linker (dyld)
+;; maps the shared cache + system dylibs from paths that are easy to miss, and
+;; a missing read makes dyld abort() the process at launch (SIGABRT, no error
+;; on stderr — the denial only shows in the unified log). So we allow reads
+;; broadly and carve out the credentials at the BOTTOM (last-match-wins),
+;; which is the part that actually matters for the prompt-injection threat.
+(allow file-read*)
+
+;; --- Filesystem writes (tight) ---------------------------------------------
+;; Only the bot's own writable surface + temp + std devices.
+(allow file-write*
+  (subpath (string-append (param "PROJECT") "/data"))
+  (subpath (string-append (param "PROJECT") "/logs"))
+  (subpath (string-append (param "PROJECT") "/wiki"))
+  (literal (string-append (param "PROJECT") "/MEMORY.md"))
+  (subpath "/private/var/folders")
+  (subpath "/private/tmp")
+  (subpath "/tmp")
+  (literal "/dev/null")
+  (literal "/dev/dtracehelper"))
+
+;; --- Network ---------------------------------------------------------------
+;; Default: allow outbound (the bot must reach Telegram/Anthropic/etc.). When
+;; you've installed the pf anchor and set MARSCLAW_EGRESS_ENFORCED=1, you can
+;; tighten this to loopback-only (forcing everything through the local gateway)
+;; by commenting the broad allow and uncommenting the loopback block.
+(allow network*)
+;; (allow network-outbound (remote ip "127.0.0.1:*") (remote ip "localhost:*") (remote ip "::1:*"))
+;; (allow network-outbound (remote unix-socket))
+;; (allow network-bind (local ip "127.0.0.1:*"))
+
+;; --- Mach / IOKit / sysctl (generous; tightening these is a later pass) ----
+(allow mach-lookup)
+(allow iokit-open)
+(allow sysctl-read)
+(allow ipc-posix-shm)
+
+;; ===========================================================================
+;; SECURITY-CRITICAL DENIES — last-match-wins, so these override the broad
+;; reads above. This is the actual point of the sandbox: even a hijacked agent
+;; with shell cannot read these.
+;; ===========================================================================
 (deny file-read* file-write*
   (literal (string-append (param "PROJECT") "/.env")))
-
-;; Per-thread Claude credentials + transcripts. The credentials are the whole
-;; point; the transcripts are private chat history.
+(deny file-read* file-write*
+  (subpath (string-append (param "PROJECT") "/data/secrets")))
+(deny file-read* file-write*
+  (subpath (string-append (param "PROJECT") "/data/whatsapp-auth")))
 (deny file-read* file-write*
   (literal (string-append (param "HOME") "/.claude.json")))
 (deny file-read* file-write*
   (subpath (string-append (param "HOME") "/.claude")))
-
-;; Gemini CLI credentials.
 (deny file-read* file-write*
   (subpath (string-append (param "HOME") "/.gemini")))
-
-;; macOS Keychain access is gated by Security.framework + entitlements — the
-;; FS-level Keychain DB files live in ~/Library/Keychains. The Claude SDK and
-;; googleapis access keys via Security.framework APIs (mach), not direct file
-;; reads, so denying these paths blunts only the raw-file path. Combine with
-;; mach-lookup restrictions in a future iteration to also cut the API path.
 (deny file-read* file-write*
   (subpath (string-append (param "HOME") "/Library/Keychains")))
-
-;; Browser cookie jars and SSH keys — common pivot targets if the agent ever
-;; gets shell. Cheap to deny here.
 (deny file-read* file-write*
   (subpath (string-append (param "HOME") "/.ssh")))
 (deny file-read* file-write*
   (subpath (string-append (param "HOME") "/Library/Cookies")))
-
-;; --- Optional: pin network egress to localhost ----------------------------
-;;
-;; Uncomment ALL of the following block to force every outbound connection to
-;; localhost (i.e. require the llm-proxy + any other local sidecar). This is
-;; the kernel-enforced "no third-party egress" property.
-;;
-;; (deny network-outbound)
-;; (allow network-outbound (remote ip "localhost:*"))
-;; (allow network-outbound (remote ip "127.0.0.1:*"))
-;; (allow network-outbound (remote ip "::1:*"))
-;; (allow network-outbound (remote unix-socket))
-
-;; --- Process exec restrictions (optional) ---------------------------------
-;;
-;; If you also want to make Bash safer when `allow_shell=true`, uncomment to
-;; restrict process-exec to a known set of binaries. This is FS-based ACLs on
-;; the executable, not a syscall filter, so the model can still run any
-;; allowed binary with any arguments — pair with audit-log inspection.
-;;
-;; (deny process-exec)
-;; (allow process-exec (literal "/bin/sh"))
-;; (allow process-exec (literal "/bin/bash"))
-;; (allow process-exec (literal "/usr/bin/env"))
-;; (allow process-exec (subpath "/opt/homebrew/bin"))
-;; (allow process-exec (subpath "/usr/local/bin"))
-;; (allow process-exec (subpath "/usr/bin"))

@@ -11,9 +11,15 @@
 // is NOT path-checked (it can `cd`/redirect anywhere), so a determined
 // `cat .env` still works. Closing that hole needs a credential broker / real
 // sandbox — see docs/vs-nanoclaw.md. This raises the bar; it is not airtight.
+//
+// Symlink resolution: every check goes through `realpath` first so an agent
+// (with shell access) that does `ln -s ~/.claude.json data/sym` can't then
+// `Read({file_path: 'data/sym'})` past the gate. Falls back to plain `resolve`
+// when the path doesn't yet exist, so write-targets are still validated.
 
 import path from 'node:path';
 import { homedir } from 'node:os';
+import { realpathSync } from 'node:fs';
 
 const HOME = homedir();
 
@@ -29,8 +35,38 @@ export const SENSITIVE_PATHS: string[] = [
   path.join(HOME, '.gemini'), // Gemini CLI credentials
 ].map((p) => path.resolve(p));
 
+// Resolve a path through any leading symlinks so a `data/sym -> ~/.claude.json`
+// link can't sneak past the sensitive check. realpath throws ENOENT for paths
+// that don't exist yet (legitimate for Write targets); fall back to plain
+// resolve in that case — write-side gates still want to compare the literal
+// target. For partially-existing paths (parent exists, leaf doesn't) we walk
+// up to find the nearest existing ancestor, realpath that, and rejoin the
+// remaining suffix; that catches a Write to `data/sym/inside/x.txt` when
+// `data/sym` is a symlink.
+function resolveSymlinks(target: string): string {
+  const resolved = path.resolve(target);
+  try {
+    return realpathSync(resolved);
+  } catch (err) {
+    void err;
+  }
+  // Walk up to find an existing ancestor and re-suffix the rest.
+  const segs = resolved.split(path.sep);
+  for (let i = segs.length - 1; i > 0; i--) {
+    const prefix = segs.slice(0, i).join(path.sep) || path.sep;
+    try {
+      const realPrefix = realpathSync(prefix);
+      return path.join(realPrefix, ...segs.slice(i));
+    } catch (err) {
+      void err;
+      continue;
+    }
+  }
+  return resolved;
+}
+
 function isUnder(target: string, root: string): boolean {
-  const rel = path.relative(root, path.resolve(target));
+  const rel = path.relative(root, resolveSymlinks(target));
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
@@ -47,6 +83,6 @@ export function isSensitivePath(target: string): boolean {
  * require the search to be narrowed to a non-straddling subdirectory.
  */
 export function pathContainsSensitive(rootPath: string): boolean {
-  const resolved = path.resolve(rootPath);
+  const resolved = resolveSymlinks(rootPath);
   return SENSITIVE_PATHS.some((s) => isUnder(s, resolved));
 }

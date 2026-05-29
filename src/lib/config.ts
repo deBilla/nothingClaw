@@ -31,6 +31,10 @@ export interface MarsclawConfig {
   // The code the owner must send as a WhatsApp message to complete pairing.
   // Cleared once paired. Only meaningful while whatsapp_pair_owner is true.
   whatsapp_pair_code: string;
+  // Epoch-ms after which the pair window expires even if no one has sent the
+  // code. 0 means "no expiry" (legacy / disabled). Set to Date.now()+5min by
+  // setup so a paired-but-not-yet-completed session can't stay open forever.
+  whatsapp_pair_expires_at: number;
   allowed_jids: string[];
   // Telegram chat ids allowed to message the bot. Non-empty = enforce (reject
   // anyone not listed). Empty = accept all, logging each new sender's chat id
@@ -66,7 +70,16 @@ export interface MarsclawConfig {
   // (gmail_send, sheets_write, calendar_create_event, and write-style *_raw
   // calls) refuse to run. The agent reads untrusted content (email, web), so
   // acting as the owner is opt-in. Set true to allow them. See lib/mutation-gate.ts.
+  // Ignored when mutation_approval is 'all' (per-call approval supersedes it).
   allow_mutating_tools: boolean;
+  // Per-call operator approval for mutating tools.
+  //   'off' (default) → use the allow_mutating_tools flag (all-or-nothing).
+  //   'all'           → every mutating tool requires an out-of-band approval:
+  //                     the broker sends a structured prompt + nonce to the
+  //                     operator's chat, the tool blocks until the operator
+  //                     replies the nonce (intercepted before the agent sees
+  //                     it). See lib/approval-gate.ts.
+  mutation_approval: 'off' | 'all';
   // When false (default), the chat agent has NO shell: the Bash tool is removed
   // entirely (and denied as a backstop). A denylist can't make shell safe —
   // `cat .e''nv`, `python -c`, `base64`, `security find-generic-password` all
@@ -85,7 +98,20 @@ export interface MarsclawConfig {
   // "*.gov" covers every .gov sub). Empty list + allow_web=true means
   // WebSearch works (search backend only) but no WebFetch will succeed —
   // safe default. See lib/url-allowlist.ts.
+  //
+  // When egress_mode is 'gateway' AND egress is actually enforced (the launch
+  // wrapper sets MARSCLAW_EGRESS_ENFORCED=1 after establishing a netns on Linux
+  // or a verified pf anchor on macOS), this allow-list is bypassed for WebFetch
+  // — the SSRF-protected gateway becomes the boundary instead. Without enforced
+  // egress the allow-list stays the boundary (fail-safe). See tools/egress-gateway/.
   allowed_web_domains: string[];
+  // Network egress posture.
+  //   'off' (default) → no gateway; allowed_web_domains is the WebFetch boundary.
+  //   'gateway'       → all outbound is meant to traverse the local egress
+  //                     gateway. Only relaxes the allow-list when enforcement is
+  //                     confirmed via MARSCLAW_EGRESS_ENFORCED (set by the launch
+  //                     wrapper). On macOS that means the pf anchor is loaded.
+  egress_mode: 'off' | 'gateway';
 }
 
 function defaults(): MarsclawConfig {
@@ -95,6 +121,7 @@ function defaults(): MarsclawConfig {
     owner_phone: '',
     whatsapp_pair_owner: false,
     whatsapp_pair_code: '',
+    whatsapp_pair_expires_at: 0,
     allowed_jids: [],
     allowed_telegram_chats: [],
     allowed_slack_users: [],
@@ -115,9 +142,11 @@ function defaults(): MarsclawConfig {
     // budget check is auto-skipped regardless of this value.
     daily_usd_budget: 0,
     allow_mutating_tools: false,
+    mutation_approval: 'off',
     allow_shell: false,
     allow_web: false,
     allowed_web_domains: [],
+    egress_mode: 'off',
   };
 }
 
@@ -148,14 +177,43 @@ export function loadConfig(): MarsclawConfig {
   const cfg = defaults();
 
   // Overlay config.json if present.
+  //
+  // Security: a corrupted config.json must NOT silently fall back to defaults.
+  // Defaults open the channel allow-lists (`allowed_telegram_chats: []` /
+  // `allowed_slack_users: []` mean "accept all"), so a paranoid lock-down can
+  // be silently undone by a torn write or a manual edit error. We fail loud:
+  // if the file exists but is unparseable, throw and refuse to start. The
+  // operator must either fix the file or delete it explicitly.
   if (existsSync(CONFIG_PATH)) {
+    let raw: string;
     try {
-      const raw = readFileSync(CONFIG_PATH, 'utf-8');
-      const parsed = JSON.parse(raw) as Partial<MarsclawConfig>;
-      Object.assign(cfg, parsed);
+      raw = readFileSync(CONFIG_PATH, 'utf-8');
     } catch (err) {
-      log.warn('Failed to parse config.json — using defaults', { err, path: CONFIG_PATH });
+      throw new Error(
+        `Cannot read ${CONFIG_PATH}: ${(err as Error)?.message ?? String(err)}. ` +
+          `Fix permissions or delete the file to use defaults; the bot refuses to ` +
+          `start with an unreadable config to avoid silently opening allow-lists.`,
+      );
     }
+    let parsed: Partial<MarsclawConfig>;
+    try {
+      parsed = JSON.parse(raw) as Partial<MarsclawConfig>;
+    } catch (err) {
+      throw new Error(
+        `Refusing to start: ${CONFIG_PATH} is not valid JSON (${
+          (err as Error)?.message ?? String(err)
+        }). Fix the file or delete it to use defaults — the bot will not silently ` +
+          `fall back to defaults because defaults open the channel allow-lists.`,
+      );
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(
+        `Refusing to start: ${CONFIG_PATH} must be a JSON object, got ${
+          Array.isArray(parsed) ? 'array' : typeof parsed
+        }.`,
+      );
+    }
+    Object.assign(cfg, parsed);
   }
 
   // Env overrides (highest precedence).
@@ -214,6 +272,9 @@ export function loadConfig(): MarsclawConfig {
   const envAllowMut = parseBool(process.env.MARSCLAW_ALLOW_MUTATING_TOOLS);
   if (envAllowMut !== undefined) cfg.allow_mutating_tools = envAllowMut;
 
+  const envMutApproval = process.env.MARSCLAW_MUTATION_APPROVAL;
+  if (envMutApproval === 'off' || envMutApproval === 'all') cfg.mutation_approval = envMutApproval;
+
   const envAllowShell = parseBool(process.env.MARSCLAW_ALLOW_SHELL);
   if (envAllowShell !== undefined) cfg.allow_shell = envAllowShell;
 
@@ -222,6 +283,9 @@ export function loadConfig(): MarsclawConfig {
 
   const envWebDomains = parseList(process.env.MARSCLAW_ALLOWED_WEB_DOMAINS);
   if (envWebDomains !== undefined) cfg.allowed_web_domains = envWebDomains;
+
+  const envEgress = process.env.MARSCLAW_EGRESS_MODE;
+  if (envEgress === 'off' || envEgress === 'gateway') cfg.egress_mode = envEgress;
 
   cached = Object.freeze(cfg);
   return cached;

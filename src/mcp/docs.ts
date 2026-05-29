@@ -113,7 +113,7 @@ export const docsRawTool = {
     const params = (args.params ?? {}) as Record<string, unknown>;
     const account = args.account ? String(args.account) : undefined;
     if (!method) return { content: [{ type: 'text', text: 'Error: method is required' }], isError: true };
-    const blocked = blockIfMutatingMethodDisabled('docs_raw', method);
+    const blocked = await blockIfMutatingMethodDisabled('docs_raw', method);
     if (blocked) return blocked;
     try {
       const data = await callMethodPath(docsClient(account), method, params);

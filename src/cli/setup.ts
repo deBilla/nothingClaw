@@ -72,14 +72,22 @@ function normalizePhone(raw: string): string {
 }
 
 // A short, unambiguous pairing code the owner sends as a WhatsApp message to
-// complete pairing. Alphabet omits 0/O/1/I/L to avoid typos on a phone.
+// complete pairing. Alphabet omits 0/O/1/I/L to avoid typos on a phone. 8 chars
+// over a 31-char alphabet ≈ 40 bits of entropy — combined with the 5-minute
+// expiry (whatsapp_pair_expires_at), brute-forcing through the bot's polling
+// rate is not practical.
 function genPairCode(): string {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  const bytes = randomBytes(6);
+  const bytes = randomBytes(8);
   let s = '';
-  for (let i = 0; i < 6; i++) s += alphabet[bytes[i] % alphabet.length];
+  for (let i = 0; i < 8; i++) s += alphabet[bytes[i] % alphabet.length];
   return `link-${s}`;
 }
+
+// Window during which the pair code is honoured. Long enough to flip back to
+// the phone, scan a QR, send the code; short enough that a forgotten armed
+// session doesn't stay open for hours.
+const PAIR_EXPIRY_MS = 5 * 60 * 1000;
 
 async function askBotName(current: string): Promise<string> {
   bold('1. Bot name');
@@ -353,11 +361,19 @@ async function askChannels(
 // bin dirs. Returns the resolved path, or '' if the owner declined and the
 // binary isn't available — in which case the tool returns an install hint at
 // call time.
+//
+// yt-dlp is a security boundary: it runs as the bot's user and downloads /
+// parses arbitrary YouTube payloads. We pin to a validated version rather
+// than tracking upstream automatically — `--upgrade` would silently swap in
+// a compromised release on every setup re-run. Bump deliberately after
+// reading the upstream changelog.
+const YTDLP_PIN = process.env.MARSCLAW_YTDLP_VERSION ?? '2025.09.05';
+
 async function ensureYtDlp(): Promise<string> {
   bold('8. YouTube transcripts');
   info("Optional but recommended. yt-dlp lets the agent fetch a video's");
   info('transcript so it can summarise YouTube links you send. ~6MB binary,');
-  info('single-purpose.');
+  info(`single-purpose. Pinned to yt-dlp ${YTDLP_PIN}.`);
 
   const existing = findYtDlpPath();
   if (existing) {
@@ -372,6 +388,7 @@ async function ensureYtDlp(): Promise<string> {
 
   // Try in order: Homebrew (macOS), pip3 --user, pip --user. First one to
   // succeed wins; otherwise fall back to printing manual instructions.
+  // Each path pins yt-dlp to YTDLP_PIN — no `--upgrade` to a moving target.
   const tryInstall = (cmd: string, args: string[]): boolean => {
     info(`  Running: ${cmd} ${args.join(' ')}`);
     return run(cmd, args) === 0;
@@ -379,13 +396,16 @@ async function ensureYtDlp(): Promise<string> {
 
   let installed = false;
   if (process.platform === 'darwin' && which('brew')) {
+    // Homebrew doesn't expose a clean way to install an arbitrary historical
+    // version, so we install the formula and accept brew's pin. Document the
+    // expected version in the warning if it drifts.
     installed = tryInstall('brew', ['install', 'yt-dlp']);
   }
   if (!installed && which('pip3')) {
-    installed = tryInstall('pip3', ['install', '--user', '--upgrade', 'yt-dlp']);
+    installed = tryInstall('pip3', ['install', '--user', `yt-dlp==${YTDLP_PIN}`]);
   }
   if (!installed && which('pip')) {
-    installed = tryInstall('pip', ['install', '--user', '--upgrade', 'yt-dlp']);
+    installed = tryInstall('pip', ['install', '--user', `yt-dlp==${YTDLP_PIN}`]);
   }
   if (!installed) {
     warn("  Couldn't install automatically — no brew/pip found, or the install failed.");
@@ -521,19 +541,25 @@ async function main(): Promise<void> {
   let allowedJids: string[] = [];
   let pairOwner = false;
   let pairCode = '';
+  let pairExpiresAt = 0;
   if (channels.whatsappEnabled && channels.ownerPhone) {
     const phoneJid = `${channels.ownerPhone}@s.whatsapp.net`;
     if (channels.ownerPhone !== current.owner_phone) {
       allowedJids = [phoneJid];
       pairOwner = true;
       pairCode = genPairCode();
+      pairExpiresAt = Date.now() + PAIR_EXPIRY_MS;
     } else {
       allowedJids = current.allowed_jids.includes(phoneJid)
         ? [...current.allowed_jids]
         : [phoneJid, ...current.allowed_jids];
       pairOwner = current.whatsapp_pair_owner;
       pairCode = current.whatsapp_pair_code;
-      if (pairOwner && !pairCode) pairCode = genPairCode(); // arm if missing
+      pairExpiresAt = current.whatsapp_pair_expires_at;
+      if (pairOwner && !pairCode) {
+        pairCode = genPairCode(); // arm if missing
+        pairExpiresAt = Date.now() + PAIR_EXPIRY_MS;
+      }
     }
   } else if (channels.ownerPhone) {
     allowedJids = [`${channels.ownerPhone}@s.whatsapp.net`];
@@ -559,6 +585,7 @@ async function main(): Promise<void> {
       allowed_telegram_chats: channels.telegramAllowedChats,
       whatsapp_pair_owner: pairOwner,
       whatsapp_pair_code: pairCode,
+      whatsapp_pair_expires_at: pairExpiresAt,
     });
     seedMemory(ownerName, channels.ownerPhone, timezone, location);
   } catch (err) {

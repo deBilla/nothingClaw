@@ -101,8 +101,6 @@ export const calendarCreateTool = {
   },
 
   async handler(args: Record<string, unknown>) {
-    const blocked = blockIfMutationsDisabled('calendar_create_event');
-    if (blocked) return blocked;
     const account = args.account ? String(args.account) : undefined;
     const calendarId = args.calendar_id ? String(args.calendar_id) : 'primary';
     const summary = String(args.summary ?? '').trim();
@@ -111,6 +109,13 @@ export const calendarCreateTool = {
     if (!summary || !start || !end) {
       return { content: [{ type: 'text', text: 'Error: summary, start, end are required' }], isError: true };
     }
+    const attendeeList = Array.isArray(args.attendees) ? (args.attendees as unknown[]).map(String) : [];
+    const blocked = await blockIfMutationsDisabled(
+      'calendar_create_event',
+      `CREATE CALENDAR EVENT\nTitle: ${summary}\nWhen: ${start} → ${end}` +
+        (attendeeList.length ? `\nAttendees: ${attendeeList.join(', ')}` : ''),
+    );
+    if (blocked) return blocked;
     const isAllDay = /^\d{4}-\d{2}-\d{2}$/.test(start);
     const startObj = isAllDay ? { date: start } : { dateTime: start };
     const endObj = isAllDay ? { date: end } : { dateTime: end };
@@ -164,7 +169,7 @@ export const calendarRawTool = {
     if (!method) {
       return { content: [{ type: 'text', text: 'Error: method is required' }], isError: true };
     }
-    const blocked = blockIfMutatingMethodDisabled('calendar_raw', method);
+    const blocked = await blockIfMutatingMethodDisabled('calendar_raw', method);
     if (blocked) return blocked;
     try {
       const data = await callMethodPath(calendarClient(account), method, params);

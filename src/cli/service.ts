@@ -32,6 +32,7 @@ import {
 } from '../lib/launchd.ts';
 
 const PLIST_TEMPLATE = 'launchd/com.marsclaw.plist';
+const HARDENED_PLIST_TEMPLATE = 'launchd/com.marsclaw.hardened.plist';
 const PROJECT_ROOT = process.cwd();
 const HOME = homedir();
 
@@ -40,22 +41,30 @@ function which(bin: string): string | null {
   return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : null;
 }
 
-function renderPlist(): string {
+// `--hardened` selects the supervisor plist (egress gateway + LLM proxy +
+// sandboxed bot). Default install is unchanged — the plain plist runs the bot
+// directly, exactly as before.
+function renderPlist(hardened: boolean): string {
   const bunPath = which('bun');
   if (!bunPath) {
     throw new Error('bun not found on PATH — install it first (curl -fsSL https://bun.sh/install | bash)');
   }
-  const tpl = readFileSync(PLIST_TEMPLATE, 'utf-8');
+  const tpl = readFileSync(hardened ? HARDENED_PLIST_TEMPLATE : PLIST_TEMPLATE, 'utf-8');
   return tpl
     .replaceAll('{{BUN_PATH}}', bunPath)
     .replaceAll('{{PROJECT_ROOT}}', PROJECT_ROOT)
     .replaceAll('{{HOME}}', HOME);
 }
 
-function install(): void {
+function install(hardened: boolean): void {
   mkdirSync(LAUNCHAGENTS_DIR, { recursive: true });
   mkdirSync(join(PROJECT_ROOT, 'logs'), { recursive: true });
-  const plist = renderPlist();
+  const plist = renderPlist(hardened);
+  if (hardened) {
+    log.info('installing HARDENED service (egress gateway + LLM proxy + sandbox)', {
+      hint: 'enable layers via EnvironmentVariables in the installed plist',
+    });
+  }
   writeAtomic(INSTALLED_PLIST, plist);
   log.info('plist written', { path: INSTALLED_PLIST });
 
@@ -158,10 +167,11 @@ function restart(): void {
 }
 
 const sub = process.argv[3] ?? 'status';
+const hardened = process.argv.includes('--hardened');
 
 switch (sub) {
   case 'install':
-    install();
+    install(hardened);
     break;
   case 'uninstall':
     uninstall();

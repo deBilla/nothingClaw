@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.marsclaw</string>
+    <!-- Hardened launch: a single supervisor brings up the egress gateway, the
+         LLM credential proxy, and the sandboxed bot. Toggle the companions via
+         the EnvironmentVariables below. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{{PROJECT_ROOT}}/tools/sandbox/launch-hardened.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{{PROJECT_ROOT}}</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{HOME}}/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>{{HOME}}</string>
+        <key>LOG_LEVEL</key>
+        <string>info</string>
+        <key>MARSCLAW_LOG_FILE</key>
+        <string>{{PROJECT_ROOT}}/logs/marsclaw.log</string>
+        <!-- Hardening toggles. Flip to "1" to enable each layer. -->
+        <key>EGRESS_GATEWAY</key>
+        <string>0</string>
+        <key>LLM_PROXY</key>
+        <string>0</string>
+        <key>SANDBOX</key>
+        <string>1</string>
+        <!-- Set to "gateway" once the egress gateway is up; combine with
+             MARSCLAW_EGRESS_ENFORCED=1 (after pf anchor) to relax the allowlist. -->
+        <key>MARSCLAW_EGRESS_MODE</key>
+        <string>off</string>
+        <!-- When LLM_PROXY=1, point the SDK subprocess at the proxy and give it
+             a session token (the real key lives only in the proxy's env, which
+             you should inject here or via a separate mechanism). -->
+        <!--
+        <key>MARSCLAW_LLM_PROXY_URL</key>
+        <string>http://127.0.0.1:8765</string>
+        <key>MARSCLAW_LLM_PROXY_TOKEN</key>
+        <string>CHANGE-ME-ROTATABLE-SESSION-TOKEN</string>
+        -->
+    </dict>
+    <key>StandardOutPath</key>
+    <string>{{PROJECT_ROOT}}/logs/launchd-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{PROJECT_ROOT}}/logs/launchd-stderr.log</string>
+</dict>
+</plist>

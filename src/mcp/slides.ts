@@ -115,7 +115,7 @@ export const slidesRawTool = {
     const params = (args.params ?? {}) as Record<string, unknown>;
     const account = args.account ? String(args.account) : undefined;
     if (!method) return { content: [{ type: 'text', text: 'Error: method is required' }], isError: true };
-    const blocked = blockIfMutatingMethodDisabled('slides_raw', method);
+    const blocked = await blockIfMutatingMethodDisabled('slides_raw', method);
     if (blocked) return blocked;
     try {
       const data = await callMethodPath(slidesClient(account), method, params);

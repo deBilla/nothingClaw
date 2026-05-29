@@ -143,8 +143,6 @@ export const gmailSendTool = {
   },
 
   async handler(args: Record<string, unknown>) {
-    const blocked = blockIfMutationsDisabled('gmail_send');
-    if (blocked) return blocked;
     const to = asStringArray(args.to);
     const cc = asStringArray(args.cc);
     const bcc = asStringArray(args.bcc);
@@ -158,6 +156,14 @@ export const gmailSendTool = {
     if (!subject) {
       return { content: [{ type: 'text', text: 'Error: subject is required' }], isError: true };
     }
+    // Gate AFTER validation so the approval prompt shows the real recipients
+    // and subject — the operator judges a faithful structured rendering.
+    const recipients = [...to, ...cc.map((a) => `cc:${a}`), ...bcc.map((a) => `bcc:${a}`)].join(', ');
+    const blocked = await blockIfMutationsDisabled(
+      'gmail_send',
+      `SEND EMAIL\nTo: ${recipients}\nSubject: ${subject}${account ? `\nFrom account: ${account}` : ''}`,
+    );
+    if (blocked) return blocked;
     try {
       const id = await sendMessage(
         { to, cc: cc.length ? cc : undefined, bcc: bcc.length ? bcc : undefined, subject, body, replyTo },

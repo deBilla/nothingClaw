@@ -82,8 +82,6 @@ export const sheetsWriteTool = {
   },
 
   async handler(args: Record<string, unknown>) {
-    const blocked = blockIfMutationsDisabled('sheets_write');
-    if (blocked) return blocked;
     const id = String(args.spreadsheet_id ?? '').trim();
     const range = String(args.range ?? '').trim();
     const values = args.values as unknown[][];
@@ -96,6 +94,12 @@ export const sheetsWriteTool = {
         isError: true,
       };
     }
+    const rowCount = Array.isArray(values) ? values.length : 0;
+    const blocked = await blockIfMutationsDisabled(
+      'sheets_write',
+      `WRITE TO SHEET (${mode})\nSpreadsheet: ${id}\nRange: ${range}\nRows: ${rowCount}`,
+    );
+    if (blocked) return blocked;
     try {
       const s = sheetsClient(account);
       if (mode === 'append') {
@@ -143,7 +147,7 @@ export const sheetsRawTool = {
     const params = (args.params ?? {}) as Record<string, unknown>;
     const account = args.account ? String(args.account) : undefined;
     if (!method) return { content: [{ type: 'text', text: 'Error: method is required' }], isError: true };
-    const blocked = blockIfMutatingMethodDisabled('sheets_raw', method);
+    const blocked = await blockIfMutatingMethodDisabled('sheets_raw', method);
     if (blocked) return blocked;
     try {
       const data = await callMethodPath(sheetsClient(account), method, params);

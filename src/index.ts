@@ -17,6 +17,8 @@ import { enforceStartupBackoff, resetCircuitBreaker } from './lib/circuit-breake
 import { pauseTypingAfterDelivery, shutdownTyping } from './lib/typing.ts';
 import { startBackupSchedule, stopBackupSchedule } from './lib/backup.ts';
 import { startHealthServer, stopHealthServer } from './lib/health-server.ts';
+import { registerAuditAlerter } from './lib/audit-log.ts';
+import { checkPendingApproval } from './lib/approval-gate.ts';
 
 // FIRST thing on boot: if we've been crash-looping, sleep before doing
 // anything that might burn API quota. resetCircuitBreaker() in shutdown()
@@ -37,6 +39,23 @@ const router = new ChannelRouter();
 // Single dispatcher all channels share. Serializes per-thread so we never run
 // two agent processes for the same chat at once.
 const onMessage = (threadId: string, text: string) => {
+  // Mutation-approval interception. MUST run before the per-thread
+  // serialization below: when a mutating tool is blocked awaiting approval,
+  // the agent turn is parked inside the MCP tool call and still occupies this
+  // thread's inFlight slot. The operator's nonce reply arrives as a NEW
+  // message — if it queued behind that parked turn it would deadlock (the turn
+  // can't finish until the approval it's waiting for is processed). Handling it
+  // here, ahead of inFlight, breaks that cycle and keeps the nonce away from
+  // the agent entirely.
+  const approval = checkPendingApproval(db, threadId, text);
+  if (approval.consumed) {
+    log.info('mutation approval reply intercepted', { threadId });
+    if (approval.reply) {
+      void router.send(threadId, approval.reply).catch((err) => log.warn('approval ack send failed', { err }));
+    }
+    return;
+  }
+
   const prev = inFlight.get(threadId) ?? Promise.resolve();
   const next = prev.then(() => handleMessage(db, router, threadId, text)).catch((err) => {
     log.error('agent handler failed', { threadId, err });
@@ -84,6 +103,39 @@ if (process.env.MARSCLAW_WHATSAPP === '1') {
 if (router.list().length === 0) {
   log.fatal('No channels enabled. Run `bun run setup` to wire one up.');
   process.exit(1);
+}
+
+// Wire audit-density alerts to the owner via the first available channel. The
+// audit module fires this when ≥5 tool denials happen within 60s — usually a
+// prompt-injection burst. We pick the operator's first paired thread by
+// channel preference (whatsapp → telegram → slack) and DM the summary out of
+// band. Without this, the operator only learns by grepping logs/audit.log.
+const ALERT_THREAD =
+  process.env.MARSCLAW_ALERT_THREAD ??
+  pickAlertThread(router.list(), config);
+if (ALERT_THREAD) {
+  registerAuditAlerter((summary, _sample) => {
+    // Fire-and-forget; the router queues the send and we don't want audit
+    // backpressure on the agent loop.
+    void router
+      .send(ALERT_THREAD, summary)
+      .catch((err) => log.warn('audit alert delivery failed', { err }));
+  });
+  log.info('audit-density alerts active', { thread: ALERT_THREAD });
+} else {
+  log.warn('audit-density alerts inactive — set MARSCLAW_ALERT_THREAD or pair a WhatsApp/Telegram owner to enable');
+}
+
+function pickAlertThread(channels: string[], cfg: ReturnType<typeof loadConfig>): string | null {
+  // Auto-pick only when the owner is unambiguously identified by a single
+  // allow-listed sender. Slack is omitted because its threadId uses channel
+  // IDs (D…) while the allow-list holds user IDs (U…); operators wanting
+  // Slack alerts must set MARSCLAW_ALERT_THREAD explicitly.
+  if (channels.includes('whatsapp') && cfg.allowed_jids.length === 1) return `whatsapp:${cfg.allowed_jids[0]}`;
+  if (channels.includes('telegram') && cfg.allowed_telegram_chats.length === 1) {
+    return `telegram:${cfg.allowed_telegram_chats[0]}`;
+  }
+  return null;
 }
 
 // Outbox drain — delivers messages the agent queued via mcp send_message / speak.

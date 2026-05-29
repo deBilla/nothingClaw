@@ -32,6 +32,11 @@ const PREFIX = 'whatsapp:';
 const AUTH_DIR = process.env.MARSCLAW_WHATSAPP_AUTH ?? 'data/whatsapp-auth';
 const MEDIA_DIR = process.env.MARSCLAW_WHATSAPP_MEDIA ?? 'data/whatsapp-media';
 const VERBOSE = process.env.MARSCLAW_WHATSAPP_VERBOSE === '1';
+// Hard cap on a single inbound attachment. WhatsApp's own limits are ~100 MB
+// for documents and 16 MB for media, but we want a tighter ceiling so a hostile
+// sender (who's already on the allow-list) can't drive a disk-fill. Buffers
+// over this are dropped before write, the message is treated as "no attachment".
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 // Marker file written when the session is logged out and the user must
 // re-scan the QR. Cleared on successful reconnect. External monitors
 // (the health endpoint, a phone widget, a cron-driven email script) can
@@ -42,16 +47,23 @@ const REAUTH_MARKER = process.env.MARSCLAW_WHATSAPP_REAUTH_MARKER ?? 'data/whats
 // logging goes through src/lib/log.ts.
 const baileysLogger = pino({ level: VERBOSE ? 'info' : 'silent' });
 
+function tooLarge(kind: string, jid: string | null | undefined, len: number): boolean {
+  if (len <= MAX_MEDIA_BYTES) return false;
+  log.warn('whatsapp media exceeds size cap — dropping', { kind, jid, bytes: len, cap: MAX_MEDIA_BYTES });
+  return true;
+}
+
 async function tryDownloadAudio(msg: WAMessage): Promise<string | null> {
   if (!msg.message?.audioMessage) return null;
   try {
-    const buffer = await downloadMediaMessage(msg, 'buffer', {});
+    const buffer = (await downloadMediaMessage(msg, 'buffer', {})) as Buffer;
+    if (tooLarge('audio', msg.key.remoteJid, buffer.length)) return null;
     mkdirSync(MEDIA_DIR, { recursive: true });
     const mime = msg.message.audioMessage.mimetype ?? 'audio/ogg';
     const ext = mime.includes('ogg') ? 'ogg' : (mime.split('/').pop() ?? 'audio').split(';')[0];
     const id = (msg.key.id ?? `${Date.now()}`).replace(/[^a-zA-Z0-9-]/g, '_');
     const filePath = resolve(MEDIA_DIR, `${id}.${ext}`);
-    writeFileSync(filePath, buffer as Buffer);
+    writeFileSync(filePath, buffer);
     return filePath;
   } catch (err) {
     log.warn('whatsapp audio download failed', { err });
@@ -62,13 +74,14 @@ async function tryDownloadAudio(msg: WAMessage): Promise<string | null> {
 async function tryDownloadImage(msg: WAMessage): Promise<string | null> {
   if (!msg.message?.imageMessage) return null;
   try {
-    const buffer = await downloadMediaMessage(msg, 'buffer', {});
+    const buffer = (await downloadMediaMessage(msg, 'buffer', {})) as Buffer;
+    if (tooLarge('image', msg.key.remoteJid, buffer.length)) return null;
     mkdirSync(MEDIA_DIR, { recursive: true });
     const mime = msg.message.imageMessage.mimetype ?? 'image/jpeg';
     const ext = (mime.split('/').pop() ?? 'jpg').split(';')[0];
     const id = (msg.key.id ?? `${Date.now()}`).replace(/[^a-zA-Z0-9-]/g, '_');
     const filePath = resolve(MEDIA_DIR, `${id}.${ext}`);
-    writeFileSync(filePath, buffer as Buffer);
+    writeFileSync(filePath, buffer);
     return filePath;
   } catch (err) {
     log.warn('whatsapp image download failed', { err });
@@ -80,7 +93,8 @@ async function tryDownloadDocument(msg: WAMessage): Promise<{ path: string; file
   const doc = msg.message?.documentMessage ?? msg.message?.documentWithCaptionMessage?.message?.documentMessage;
   if (!doc) return null;
   try {
-    const buffer = await downloadMediaMessage(msg, 'buffer', {});
+    const buffer = (await downloadMediaMessage(msg, 'buffer', {})) as Buffer;
+    if (tooLarge('document', msg.key.remoteJid, buffer.length)) return null;
     mkdirSync(MEDIA_DIR, { recursive: true });
     const id = (msg.key.id ?? `${Date.now()}`).replace(/[^a-zA-Z0-9-]/g, '_');
     // Sanitize the inbound filename. Even after isSafeAttachmentName, we
@@ -96,7 +110,7 @@ async function tryDownloadDocument(msg: WAMessage): Promise<{ path: string; file
     const mimeExt = (mime.split('/').pop() ?? 'bin').split(';')[0];
     const ext = sanitised.includes('.') ? sanitised.split('.').pop()! : mimeExt;
     const filePath = resolve(MEDIA_DIR, `${id}.${ext}`);
-    writeFileSync(filePath, buffer as Buffer);
+    writeFileSync(filePath, buffer);
     return { path: filePath, fileName: sanitised || `document.${ext}` };
   } catch (err) {
     log.warn('whatsapp document download failed', { err });
@@ -138,7 +152,30 @@ export async function createWhatsappChannel(opts: ChannelInit): Promise<Channel>
   // carrying the pairing code — then it captures that sender's real JID.
   let pairOwner = config.whatsapp_pair_owner;
   let pairCode = config.whatsapp_pair_code;
+  // Treat any non-positive expiry as "no expiry" — preserves the legacy
+  // config-shape where the field was absent. If it's set, refuse the code
+  // after the deadline.
+  let pairExpiresAt = config.whatsapp_pair_expires_at;
   const voiceEnabled = config.voice_enabled;
+  // Drop the pair window when the deadline lapses (called on every inbound
+  // message during the pair phase). Persists the flip so a restart doesn't
+  // re-arm a stale code.
+  const expirePairIfDue = (): boolean => {
+    if (!pairOwner) return false;
+    if (pairExpiresAt > 0 && Date.now() > pairExpiresAt) {
+      pairOwner = false;
+      pairCode = '';
+      pairExpiresAt = 0;
+      try {
+        writeConfig({ whatsapp_pair_owner: false, whatsapp_pair_code: '', whatsapp_pair_expires_at: 0 });
+        log.warn('whatsapp pair window expired — pairing disarmed; rerun setup to re-arm');
+      } catch (err) {
+        log.error('whatsapp failed to persist pair-expiry disarm', { err });
+      }
+      return true;
+    }
+    return false;
+  };
 
   // Exact JID match (existing behaviour) OR phone-number match against the
   // configured owner number (covers @s.whatsapp.net device-suffix variants).
@@ -154,10 +191,16 @@ export async function createWhatsappChannel(opts: ChannelInit): Promise<Channel>
   const captureOwner = (jid: string): void => {
     pairOwner = false;
     pairCode = '';
+    pairExpiresAt = 0;
     const added = !allowedJids.has(jid);
     if (added) allowedJids.add(jid);
     try {
-      writeConfig({ allowed_jids: [...allowedJids], whatsapp_pair_owner: false, whatsapp_pair_code: '' });
+      writeConfig({
+        allowed_jids: [...allowedJids],
+        whatsapp_pair_owner: false,
+        whatsapp_pair_code: '',
+        whatsapp_pair_expires_at: 0,
+      });
       log.warn('whatsapp owner paired — allow-list locked to this sender', { jid, added });
     } catch (err) {
       log.error('whatsapp failed to persist paired owner', { jid, err });
@@ -197,9 +240,11 @@ export async function createWhatsappChannel(opts: ChannelInit): Promise<Channel>
         // is exactly when the operator is watching the logs (e.g. setup just
         // auto-started the bot). They send this code from their phone to lock
         // the allow-list to their chat.
-        if (pairOwner && pairCode) {
+        if (pairOwner && pairCode && !expirePairIfDue()) {
+          const remainingMs = pairExpiresAt > 0 ? Math.max(0, pairExpiresAt - Date.now()) : 0;
           log.warn('whatsapp pairing armed — send this code from your phone to finish pairing', {
             code: pairCode,
+            expiresInSec: remainingMs ? Math.ceil(remainingMs / 1000) : 'no-expiry',
           });
         }
       }
@@ -264,7 +309,11 @@ export async function createWhatsappChannel(opts: ChannelInit): Promise<Channel>
         // (possibly an @lid) is captured and locked in. Every other message is
         // ignored silently: the bot runs as the owner's account, so its normal
         // contacts must not get auto-replies during the pairing window.
-        if (pairOwner && pairCode) {
+        //
+        // Honour the deadline: a forgotten armed config that's been sitting
+        // for hours (or persisted across a restart) is disarmed before any
+        // candidate code is evaluated.
+        if (pairOwner && pairCode && !expirePairIfDue()) {
           const candidate = extractText(msg.message).trim().toLowerCase();
           if (candidate && candidate.includes(pairCode.toLowerCase())) {
             captureOwner(msg.key.remoteJid);

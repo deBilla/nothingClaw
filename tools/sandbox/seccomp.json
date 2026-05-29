@@ -1,0 +1,57 @@
+{
+  "_comment": [
+    "Linux seccomp policy for the marsClaw agent — OCI/Docker seccomp format.",
+    "Default-allow with an explicit denylist of syscalls a chat agent never",
+    "legitimately needs but that are useful for sandbox escape, privilege",
+    "escalation, kernel tampering, or namespace manipulation.",
+    "",
+    "Usage:",
+    "  - Containerized Linux (Docker/podman, the NanoClaw-style deploy):",
+    "      docker run --security-opt seccomp=tools/sandbox/seccomp.json ...",
+    "  - bubblewrap: bwrap's --seccomp takes a COMPILED cBPF program on an fd,",
+    "    not this JSON. Compile it with a small libseccomp helper (python:",
+    "    `seccomp.SyscallFilter` adding each name with ERRNO) and pass the fd.",
+    "    This file is the source-of-truth policy for that step.",
+    "",
+    "A default-allow denylist is deliberate: a default-deny allowlist for a",
+    "Node/Bun process is a large, fragile surface (hundreds of syscalls). The",
+    "denylist closes the high-value escape vectors with near-zero breakage risk."
+  ],
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "architectures": ["SCMP_ARCH_X86_64", "SCMP_ARCH_AARCH64"],
+  "syscalls": [
+    {
+      "names": [
+        "ptrace",
+        "process_vm_readv",
+        "process_vm_writev",
+        "mount",
+        "umount",
+        "umount2",
+        "pivot_root",
+        "chroot",
+        "setns",
+        "unshare",
+        "kexec_load",
+        "kexec_file_load",
+        "bpf",
+        "perf_event_open",
+        "keyctl",
+        "add_key",
+        "request_key",
+        "init_module",
+        "finit_module",
+        "delete_module",
+        "reboot",
+        "swapon",
+        "swapoff",
+        "settimeofday",
+        "clock_settime",
+        "acct",
+        "quotactl"
+      ],
+      "action": "SCMP_ACT_ERRNO",
+      "errnoRet": 1
+    }
+  ]
+}

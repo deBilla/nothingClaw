@@ -10,6 +10,7 @@
 import { App, LogLevel } from '@slack/bolt';
 import { loadConfig } from '../lib/config.ts';
 import { log } from '../lib/log.ts';
+import { RateLimiter } from '../lib/rate-limit.ts';
 import type { Channel, ChannelInit, SendOpts } from './types.ts';
 
 export interface SlackOptions extends ChannelInit {
@@ -29,7 +30,8 @@ export async function createSlackChannel(opts: SlackOptions): Promise<Channel> {
 
   // Sender allow-list. Non-empty = reject any Slack user not listed. Empty =
   // accept all, warning once per new user id so the owner can lock it down.
-  const allowed = new Set(loadConfig().allowed_slack_users.map((u) => String(u).trim()).filter(Boolean));
+  const config = loadConfig();
+  const allowed = new Set(config.allowed_slack_users.map((u) => String(u).trim()).filter(Boolean));
   const warnedOpen = new Set<string>();
   function senderAllowed(user: string | undefined): boolean {
     const uid = String(user ?? '');
@@ -50,6 +52,25 @@ export async function createSlackChannel(opts: SlackOptions): Promise<Channel> {
     });
     return false;
   }
+  // Per-sender rate limit. A Slack workspace member who knows the bot is up
+  // can otherwise drive arbitrary agent turns; Socket Mode delivers everything
+  // they DM. Same defaults as the other channels (10/min, 60/hr).
+  const limiter =
+    config.rate_limit_per_minute > 0 || config.rate_limit_per_hour > 0
+      ? new RateLimiter({
+          perMinute: config.rate_limit_per_minute || Infinity,
+          perHour: config.rate_limit_per_hour || Infinity,
+        })
+      : null;
+  function rateOk(key: string): boolean {
+    if (!limiter) return true;
+    const v = limiter.check(key);
+    if (!v.ok) {
+      log.warn('slack rate-limited', { key, reason: v.reason, retryAfterMs: v.retryAfterMs });
+      return false;
+    }
+    return true;
+  }
 
   app.message(async ({ message }) => {
     if ('subtype' in message && message.subtype) return; // edits, joins, bot-sent, etc.
@@ -57,6 +78,7 @@ export async function createSlackChannel(opts: SlackOptions): Promise<Channel> {
     if (m.bot_id) return;
     if (!m.text || !m.channel) return;
     if (!senderAllowed(m.user)) return;
+    if (!rateOk(m.user ?? m.channel)) return;
     const threadId = `${PREFIX}${m.channel}`;
     try {
       await opts.onMessage(threadId, m.text);
@@ -69,6 +91,7 @@ export async function createSlackChannel(opts: SlackOptions): Promise<Channel> {
     const e = event as { text?: string; channel?: string; user?: string };
     if (!e.text || !e.channel) return;
     if (!senderAllowed(e.user)) return;
+    if (!rateOk(e.user ?? e.channel)) return;
     const threadId = `${PREFIX}${e.channel}`;
     try {
       await opts.onMessage(threadId, e.text);

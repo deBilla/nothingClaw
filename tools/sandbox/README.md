@@ -8,9 +8,26 @@ This is a stub. Read the source comments before deploying — there are delibera
 
 | File | Platform | What it does |
 |---|---|---|
-| `marsclaw.sb` | macOS | sandbox-exec profile — denies reads/writes to credential paths. |
-| `run-macos.sh` | macOS | Wrapper that starts the bot under the profile. |
-| `run-linux.sh` | Linux | bubblewrap wrapper — FS namespacing, dropped caps, tmpfs HOME. |
+| `marsclaw.sb` | macOS | sandbox-exec profile — **deny-default**; broad allows for Bun/Node + credential denies. Expect to add allows on first runs (see profile header). |
+| `run-macos.sh` | macOS | Wrapper that starts the bot under the profile + sets egress proxy env. |
+| `run-linux.sh` | Linux | bubblewrap wrapper — FS namespacing, dropped caps, tmpfs HOME, `.env` passed via `--setenv` (not bind-mounted), egress proxy env. |
+| `launch-hardened.sh` | both | Supervisor: starts the egress gateway + LLM proxy (opt-in via env) then execs the sandboxed bot. The single entry point for the hardened service. |
+| `pf-anchor.conf` | macOS | Packet-filter rules — the REAL egress enforcer (drops outbound from the bot's user except to the gateway + DNS). |
+| `install-pf-anchor.sh` | macOS | sudo loader for the pf anchor. |
+| `seccomp.json` | Linux | OCI-format syscall denylist (ptrace/mount/setns/bpf/…). For Docker `--security-opt` or libseccomp compilation. |
+
+## Hardened service install
+
+`bun run service install --hardened` installs a launchd plist that runs
+`launch-hardened.sh` instead of the bot directly. Toggle layers via the plist's
+`EnvironmentVariables`:
+
+- `EGRESS_GATEWAY=1` — start the SSRF-protected egress gateway
+- `LLM_PROXY=1` (+ `MARSCLAW_LLM_PROXY_URL`/`MARSCLAW_LLM_PROXY_TOKEN`) — credential isolation
+- `SANDBOX=1` (default) — run the bot under the platform sandbox wrapper
+- `MARSCLAW_EGRESS_MODE=gateway` + `MARSCLAW_EGRESS_ENFORCED=1` — relax the URL allow-list (only after the pf anchor is loaded on macOS)
+
+The default `bun run service install` (no flag) is unchanged — bot runs directly.
 
 ## How to use
 

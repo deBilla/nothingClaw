@@ -42,28 +42,28 @@ describe('mutation gate', () => {
     }
   });
 
-  it('blocks always-mutating tools when disabled', () => {
+  it('blocks always-mutating tools when disabled', async () => {
     setMutating(false);
-    const r = blockIfMutationsDisabled('gmail_send');
+    const r = await blockIfMutationsDisabled('gmail_send');
     expect(r?.isError).toBe(true);
     expect(r?.content[0]?.text).toContain('allow_mutating_tools');
   });
 
-  it('allows always-mutating tools when enabled', () => {
+  it('allows always-mutating tools when enabled', async () => {
     setMutating(true);
-    expect(blockIfMutationsDisabled('gmail_send')).toBeNull();
+    expect(await blockIfMutationsDisabled('gmail_send')).toBeNull();
   });
 
-  it('lets read-only raw methods through even when mutations are disabled', () => {
+  it('lets read-only raw methods through even when mutations are disabled', async () => {
     setMutating(false);
-    expect(blockIfMutatingMethodDisabled('calendar_raw', 'events.list')).toBeNull();
-    expect(blockIfMutatingMethodDisabled('drive_raw', 'files.export')).toBeNull();
+    expect(await blockIfMutatingMethodDisabled('calendar_raw', 'events.list')).toBeNull();
+    expect(await blockIfMutatingMethodDisabled('drive_raw', 'files.export')).toBeNull();
   });
 
-  it('blocks write raw methods when disabled, allows when enabled', () => {
+  it('blocks write raw methods when disabled, allows when enabled', async () => {
     setMutating(false);
-    expect(blockIfMutatingMethodDisabled('drive_raw', 'files.create')?.isError).toBe(true);
+    expect((await blockIfMutatingMethodDisabled('drive_raw', 'files.create'))?.isError).toBe(true);
     setMutating(true);
-    expect(blockIfMutatingMethodDisabled('drive_raw', 'files.create')).toBeNull();
+    expect(await blockIfMutatingMethodDisabled('drive_raw', 'files.create')).toBeNull();
   });
 });

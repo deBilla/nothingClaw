@@ -1,4 +1,4 @@
-// Local LLM credential-isolation proxy. STUB.
+// Local LLM credential-isolation proxy.
 //
 // The agent process today holds ANTHROPIC_API_KEY and CLAUDE_CODE_OAUTH_TOKEN
 // in its env. A successful prompt injection that obtains shell or arbitrary
@@ -19,16 +19,20 @@
 //     a leaked session token is rotatable without touching Anthropic.
 //   - Only the Anthropic host + Messages-shaped paths are forwarded; anything
 //     else gets a 404 (no general HTTP proxy capability for the agent).
-//   - Every request is logged with model, in/out tokens, latency, and the
-//     first 200 chars of the prompt — providing one place to enforce per-day
-//     budgets, redact PII, or block unusual patterns.
+//   - The upstream response is streamed back unchanged, so SSE token-streaming
+//     in the Anthropic Messages API still works.
+//   - Every request is recorded into the same audit log the in-process gates
+//     write to (`logs/audit.log` via `src/lib/audit-log.ts`), so wire-level
+//     events line up with tool decisions in one place.
 //
 // Out of scope for this stub:
-//   - PII redaction (placeholder hook is wired)
+//   - PII redaction (placeholder hook is wired but no-op)
 //   - Per-thread budgeting (cost-tracker.ts already does this in-agent; this
 //     proxy can take it over so it survives agent compromise)
 //   - Gemini support (Gemini CLI uses OAuth-via-browser, not a bearer; needs
-//     a different shape — file an issue)
+//     a different shape)
+
+import { audit } from '../../src/lib/audit-log.ts';
 
 const PORT = Number(process.env.LLM_PROXY_PORT ?? 8765);
 const HOST = process.env.LLM_PROXY_HOST ?? '127.0.0.1';
@@ -48,19 +52,25 @@ if (!SESSION_TOKEN) {
 }
 
 // Paths we forward. Anthropic Messages API + the SDK's auxiliary endpoints.
+// Compared against the parsed `url.pathname`, which the WHATWG URL parser has
+// already collapsed (`..` segments cannot survive parsing into pathname).
 const ALLOWED_PREFIXES = ['/v1/messages', '/v1/models', '/v1/complete'];
 
 function isAllowedPath(p: string): boolean {
-  return ALLOWED_PREFIXES.some((prefix) => p === prefix || p.startsWith(`${prefix}/`) || p.startsWith(`${prefix}?`));
+  // Defense-in-depth: a `..` in the literal pathname means the parser saw it
+  // as a NAMED segment (e.g. `/v1/messages%2F..%2Fadmin`) — refuse explicitly.
+  if (p.includes('..')) return false;
+  return ALLOWED_PREFIXES.some((prefix) => p === prefix || p.startsWith(`${prefix}/`));
 }
 
-// Hook point for PII redaction. Stub returns body unchanged.
+// Hook point for PII redaction. Stub returns body unchanged. Plug a regex
+// sweep here (emails, phone numbers, refresh-token shapes) before requests
+// reach Anthropic if your threat model includes their server-side logs.
 function redact(body: string): string {
   return body;
 }
 
-interface LogLine {
-  ts: string;
+interface AuditLine {
   method: string;
   path: string;
   status: number;
@@ -71,10 +81,21 @@ interface LogLine {
   reason?: string;
 }
 
-function logLine(line: LogLine): void {
-  // Stdout is captured by launchd / systemd into logs/. Keep it as JSONL so a
-  // future audit-log sink can ingest it uniformly with logs/audit.log.
-  console.log(JSON.stringify(line));
+function record(line: AuditLine): void {
+  // Funnel into the in-process audit log so the operator has one file to
+  // grep. `decision: 'allow'` for forwarded, `'deny'` for rejected (auth
+  // fail / path not allowed), `'blocked'` reserved for budget-gate later.
+  const decision: 'allow' | 'deny' | 'blocked' = line.status >= 400 && line.status < 500 ? 'deny' : 'allow';
+  audit({
+    tool: 'llm-proxy',
+    decision,
+    layer: 'url-allowlist',
+    subject: `${line.method} ${line.path} → ${line.status} (${line.ms}ms, ${line.bytesIn}B→${line.bytesOut}B)`,
+    reason: line.reason,
+  });
+  // Also tee to stdout (launchd/systemd capture) as one structured JSON line
+  // so an operator watching `tail -f` sees activity in real time.
+  console.log(JSON.stringify({ ts: new Date().toISOString(), ...line }));
 }
 
 function previewBody(body: string): string | undefined {
@@ -94,16 +115,16 @@ Bun.serve({
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const startedAt = performance.now();
-    const baseLog = { ts: new Date().toISOString(), method: req.method, path: url.pathname };
+    const baseLog = { method: req.method, path: url.pathname };
 
     if (!isAllowedPath(url.pathname)) {
-      logLine({ ...baseLog, status: 404, ms: 0, bytesIn: 0, bytesOut: 0, reason: 'path not allowed' });
+      record({ ...baseLog, status: 404, ms: 0, bytesIn: 0, bytesOut: 0, reason: 'path not allowed' });
       return new Response('not found', { status: 404 });
     }
 
     const presented = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? req.headers.get('x-api-key');
     if (presented !== SESSION_TOKEN) {
-      logLine({ ...baseLog, status: 401, ms: 0, bytesIn: 0, bytesOut: 0, reason: 'bad session token' });
+      record({ ...baseLog, status: 401, ms: 0, bytesIn: 0, bytesOut: 0, reason: 'bad session token' });
       return new Response('unauthorized', { status: 401 });
     }
 
@@ -126,18 +147,42 @@ Bun.serve({
       body: bodyText.length > 0 ? bodyText : undefined,
     });
 
-    // Stream the body through unchanged. We read the size for the audit line
-    // without buffering by piping through a tee — but for the stub, buffer.
-    const outBody = await resp.arrayBuffer();
-    logLine({
-      ...baseLog,
-      status: resp.status,
-      ms: Math.round(performance.now() - startedAt),
-      bytesIn: bodyText.length,
-      bytesOut: outBody.byteLength,
-      preview: bodyText.length > 0 ? previewBody(bodyText) : undefined,
-    });
-    return new Response(outBody, { status: resp.status, headers: resp.headers });
+    // Stream the upstream body through unchanged. Critical for SSE responses
+    // from /v1/messages — buffering would defeat token-by-token streaming.
+    // We tee bytes through a TransformStream to count them for the audit
+    // line without materialising the whole response in memory.
+    let bytesOut = 0;
+    const teed = resp.body?.pipeThrough(
+      new TransformStream({
+        transform(chunk: Uint8Array, controller) {
+          bytesOut += chunk.byteLength;
+          controller.enqueue(chunk);
+        },
+        flush() {
+          record({
+            ...baseLog,
+            status: resp.status,
+            ms: Math.round(performance.now() - startedAt),
+            bytesIn: bodyText.length,
+            bytesOut,
+            preview: bodyText.length > 0 ? previewBody(bodyText) : undefined,
+          });
+        },
+      }),
+    );
+    // No body (e.g. 204) — record immediately and return empty.
+    if (!teed) {
+      record({
+        ...baseLog,
+        status: resp.status,
+        ms: Math.round(performance.now() - startedAt),
+        bytesIn: bodyText.length,
+        bytesOut: 0,
+        preview: bodyText.length > 0 ? previewBody(bodyText) : undefined,
+      });
+      return new Response(null, { status: resp.status, headers: resp.headers });
+    }
+    return new Response(teed, { status: resp.status, headers: resp.headers });
   },
 });
 

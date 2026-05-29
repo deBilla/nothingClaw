@@ -118,6 +118,37 @@ describe('canUseTool', () => {
     expect((await call(fn, 'WebFetch', { url: 'https://wikipedia.org/' })).behavior).toBe('deny');
   });
 
+  describe('egress-gateway allow-list relaxation', () => {
+    const prev = process.env.MARSCLAW_EGRESS_ENFORCED;
+    afterEach(() => {
+      if (prev === undefined) delete process.env.MARSCLAW_EGRESS_ENFORCED;
+      else process.env.MARSCLAW_EGRESS_ENFORCED = prev;
+    });
+
+    it('relaxes the allow-list only when egress_mode=gateway AND enforcement is asserted', async () => {
+      process.env.MARSCLAW_EGRESS_ENFORCED = '1';
+      const fn = buildCanUseTool(configWith({ egress_mode: 'gateway', allowed_web_domains: [] }));
+      // Not on the (empty) allow-list, but enforced gateway → allowed.
+      expect((await call(fn, 'WebFetch', { url: 'https://anything.example/' })).behavior).toBe('allow');
+      // Loopback / non-http(s) still rejected even under gateway mode.
+      expect((await call(fn, 'WebFetch', { url: 'http://127.0.0.1/' })).behavior).toBe('deny');
+      expect((await call(fn, 'WebFetch', { url: 'file:///etc/passwd' })).behavior).toBe('deny');
+    });
+
+    it('does NOT relax when egress is not asserted enforced (fail-safe)', async () => {
+      delete process.env.MARSCLAW_EGRESS_ENFORCED;
+      const fn = buildCanUseTool(configWith({ egress_mode: 'gateway', allowed_web_domains: [] }));
+      // gateway mode configured but enforcement flag absent → allow-list still governs.
+      expect((await call(fn, 'WebFetch', { url: 'https://anything.example/' })).behavior).toBe('deny');
+    });
+
+    it('does NOT relax when egress_mode is off even if the flag is set', async () => {
+      process.env.MARSCLAW_EGRESS_ENFORCED = '1';
+      const fn = buildCanUseTool(configWith({ egress_mode: 'off', allowed_web_domains: ['wikipedia.org'] }));
+      expect((await call(fn, 'WebFetch', { url: 'https://attacker.com/' })).behavior).toBe('deny');
+    });
+  });
+
   it('removes the shell entirely when allow_shell is false', async () => {
     const fn = buildCanUseTool(configWith({ allow_shell: false }));
     expect((await call(fn, 'Bash', { command: 'ls -la' })).behavior).toBe('deny');
@@ -232,13 +263,17 @@ describe('canUseTool', () => {
     });
   });
 
-  it('bypass env restores unrestricted access', async () => {
+  it('MARSCLAW_TOOL_PERMISSIONS=bypass is NOT honoured — gates stay live', async () => {
+    // The legacy bypass escape hatch was removed: a global "disable every
+    // gate" toggle in a running deployment is a foot-gun. Setting the var
+    // must not loosen anything; the bot logs once and proceeds with the
+    // normal gate.
     const before = process.env.MARSCLAW_TOOL_PERMISSIONS;
     process.env.MARSCLAW_TOOL_PERMISSIONS = 'bypass';
     try {
       const fn = buildCanUseTool(configWith({}));
-      expect((await call(fn, 'Read', { file_path: '/etc/passwd' })).behavior).toBe('allow');
-      expect((await call(fn, 'Bash', { command: 'rm -rf /' })).behavior).toBe('allow');
+      expect((await call(fn, 'Read', { file_path: '/etc/passwd' })).behavior).toBe('deny');
+      expect((await call(fn, 'Bash', { command: 'rm -rf /' })).behavior).toBe('deny');
     } finally {
       if (before === undefined) delete process.env.MARSCLAW_TOOL_PERMISSIONS;
       else process.env.MARSCLAW_TOOL_PERMISSIONS = before;

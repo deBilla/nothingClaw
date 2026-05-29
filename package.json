@@ -6,6 +6,11 @@
   "bin": {
     "marsclaw": "./src/cli/index.ts"
   },
+  "engines": {
+    "node": ">=22.18 <23",
+    "bun": ">=1.3.0"
+  },
+  "trustedDependencies": [],
   "scripts": {
     "setup": "bun run src/cli/index.ts setup",
     "start": "bun run src/cli/index.ts start",
@@ -23,6 +28,8 @@
     "smoke": "bun run src/cli/index.ts smoke",
     "dev": "bun run src/cli/index.ts start",
     "mcp": "bun run src/mcp/server.ts",
+    "llm-proxy": "bun run tools/llm-proxy/proxy.ts",
+    "egress-gateway": "bun run tools/egress-gateway/gateway.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests",
     "lint:fix": "eslint src tests --fix",
@@ -45,7 +52,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
-    "@types/bun": "latest",
+    "@types/bun": "1.3.14",
     "@types/node-telegram-bot-api": "^0.64.7",
     "@types/qrcode-terminal": "^0.12.2",
     "eslint": "^9.15.0",
@@ -56,6 +63,6 @@
     "typescript-eslint": "^8.15.0"
   },
   "overrides": {
-    "google-auth-library": "^10.1.0"
+    "google-auth-library": "10.6.2"
   }
 }

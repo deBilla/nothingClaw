@@ -49,4 +49,22 @@ describe('url-allowlist', () => {
   it('ignores whitespace and case in allow-list entries', () => {
     expect(urlAllowed('https://Example.com/', ['  EXAMPLE.com  '])).toBe(true);
   });
+
+  it('rejects IDN homograph hosts even when their allow-list entry looks the same', () => {
+    // Cyrillic а (U+0430) — visually identical to Latin a, but a different
+    // codepoint. WHATWG URL parses Unicode hostnames into Punycode (xn--…).
+    // Both shapes must be denied so an attacker can't pivot through a typo'd
+    // allow-list entry.
+    const list = ['wikipedia.org'];
+    expect(urlAllowed('https://wikipediа.org/', list)).toBe(false);
+    expect(urlAllowed('https://xn--wikipedi-86g.org/', list)).toBe(false);
+    expect(urlHost('https://wikipediа.org/')).toBeNull();
+    expect(urlHost('https://xn--wikipedi-86g.org/')).toBeNull();
+  });
+
+  it('rejects non-ASCII allow-list entries (dead config, would silently never match)', () => {
+    // Pure ASCII host but Unicode in the allow-list entry — the operator
+    // probably typed the wrong codepoint. Must not match anything quietly.
+    expect(urlAllowed('https://wikipedia.org/', ['wikipediа.org'])).toBe(false);
+  });
 });

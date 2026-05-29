@@ -25,6 +25,29 @@ if [[ ! -r "$PROFILE" ]]; then
   exit 1
 fi
 
+# Egress routing (best-effort on macOS). Pointing proxy env vars at the local
+# gateway routes any component that honors them. This is a HINT, not
+# enforcement — Node's global fetch/undici and several client libraries ignore
+# proxy env. The REAL enforcer on macOS is the pf anchor (see
+# tools/sandbox/pf-anchor.conf + install-pf-anchor.sh), which drops outbound at
+# the socket layer regardless of library behavior.
+GATEWAY_PORT="${EGRESS_GATEWAY_PORT:-8775}"
+export HTTPS_PROXY="http://127.0.0.1:${GATEWAY_PORT}"
+export HTTP_PROXY="http://127.0.0.1:${GATEWAY_PORT}"
+export ALL_PROXY="http://127.0.0.1:${GATEWAY_PORT}"
+export NO_PROXY="127.0.0.1,localhost"
+
+# MARSCLAW_EGRESS_ENFORCED gates the URL-allowlist relaxation. We do NOT set it
+# automatically: verifying the pf anchor is loaded needs root, and the bot
+# launch isn't root. Set it to 1 in your launchd plist / .env ONLY after
+# installing and verifying the pf anchor (install-pf-anchor.sh). Until then the
+# allow-list stays the boundary — the safe default the operator chose.
+if [[ "${MARSCLAW_EGRESS_ENFORCED:-}" == "1" ]]; then
+  echo "run-macos.sh: egress enforcement asserted — URL allow-list will be relaxed" >&2
+else
+  echo "run-macos.sh: egress NOT asserted enforced — URL allow-list remains active (install pf anchor + set MARSCLAW_EGRESS_ENFORCED=1 to relax)" >&2
+fi
+
 # sandbox-exec emits a noisy deprecation warning on every invocation —
 # acknowledged, still works, no alternative for this use case yet.
 exec sandbox-exec \

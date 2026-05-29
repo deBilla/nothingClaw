@@ -17,7 +17,7 @@ describe('migrations', () => {
   it('fresh database applies every migration in order', () => {
     const db = new Database(':memory:');
     runMigrations(db);
-    expect(appliedVersions(db)).toEqual([1, 2, 3, 4]);
+    expect(appliedVersions(db)).toEqual([1, 2, 3, 4, 5]);
     expect(tableExists(db, 'messages')).toBe(true);
     expect(tableExists(db, 'outbox')).toBe(true);
     expect(tableExists(db, 'sessions')).toBe(true);
@@ -30,7 +30,7 @@ describe('migrations', () => {
     const db = new Database(':memory:');
     runMigrations(db);
     runMigrations(db);
-    expect(appliedVersions(db)).toEqual([1, 2, 3, 4]);
+    expect(appliedVersions(db)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('bootstrap-stamps pre-existing schema', () => {
@@ -44,7 +44,7 @@ describe('migrations', () => {
       CREATE TABLE sessions (thread_id TEXT PRIMARY KEY, provider TEXT NOT NULL, session_id TEXT NOT NULL, updated_at INTEGER NOT NULL DEFAULT (unixepoch()));
     `);
     runMigrations(db);
-    expect(appliedVersions(db)).toEqual([1, 2, 3, 4]);
+    expect(appliedVersions(db)).toEqual([1, 2, 3, 4, 5]);
     const cols = db.query('PRAGMA table_info(outbox)').all() as { name: string }[];
     expect(cols.map((c) => c.name)).toContain('attempts');
   });
