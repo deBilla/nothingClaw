@@ -1,0 +1,84 @@
+;; marsClaw macOS sandbox profile — STUB.
+;;
+;; sandbox-exec is the legacy macOS interface to the kernel-level Sandbox
+;; (formerly seatbelt). It is undocumented and Apple has marked it deprecated,
+;; but it still works on current macOS and is the only way to get TrustedBSD-MAC
+;; FS containment without writing a System Extension. Treat this file as defence
+;; in depth on top of the in-process gates — not as a replacement for them.
+;;
+;; The profile is intentionally permissive on syscalls and network, and tight
+;; on filesystem. The credential exfil path (read .env / ~/.claude.json /
+;; data/secrets/) is what we cut here. Closing network requires either an
+;; outbound-only block list (see deny network-outbound section near the end)
+;; or pairing this with the local llm-proxy sidecar.
+;;
+;; Usage:
+;;   tools/sandbox/run-macos.sh              # start the bot under this profile
+;;   sandbox-exec -f tools/sandbox/marsclaw.sb -D PROJECT=$PWD -D HOME=$HOME \
+;;                bun run src/cli/index.ts start
+
+(version 1)
+
+;; Default-allow on most operations; we only deny specific high-value targets.
+;; A default-deny profile is feasible but requires enumerating every mach-lookup
+;; and IOKit class the SDK touches — that's a separate hardening pass.
+(allow default)
+
+;; --- The exfiltration class we actually want to close ----------------------
+
+;; .env — channel tokens, OAuth client secrets, ANTHROPIC_API_KEY if not OAuth.
+(deny file-read* file-write*
+  (literal (string-append (param "PROJECT") "/.env")))
+
+;; Per-thread Claude credentials + transcripts. The credentials are the whole
+;; point; the transcripts are private chat history.
+(deny file-read* file-write*
+  (literal (string-append (param "HOME") "/.claude.json")))
+(deny file-read* file-write*
+  (subpath (string-append (param "HOME") "/.claude")))
+
+;; Gemini CLI credentials.
+(deny file-read* file-write*
+  (subpath (string-append (param "HOME") "/.gemini")))
+
+;; macOS Keychain access is gated by Security.framework + entitlements — the
+;; FS-level Keychain DB files live in ~/Library/Keychains. The Claude SDK and
+;; googleapis access keys via Security.framework APIs (mach), not direct file
+;; reads, so denying these paths blunts only the raw-file path. Combine with
+;; mach-lookup restrictions in a future iteration to also cut the API path.
+(deny file-read* file-write*
+  (subpath (string-append (param "HOME") "/Library/Keychains")))
+
+;; Browser cookie jars and SSH keys — common pivot targets if the agent ever
+;; gets shell. Cheap to deny here.
+(deny file-read* file-write*
+  (subpath (string-append (param "HOME") "/.ssh")))
+(deny file-read* file-write*
+  (subpath (string-append (param "HOME") "/Library/Cookies")))
+
+;; --- Optional: pin network egress to localhost ----------------------------
+;;
+;; Uncomment ALL of the following block to force every outbound connection to
+;; localhost (i.e. require the llm-proxy + any other local sidecar). This is
+;; the kernel-enforced "no third-party egress" property.
+;;
+;; (deny network-outbound)
+;; (allow network-outbound (remote ip "localhost:*"))
+;; (allow network-outbound (remote ip "127.0.0.1:*"))
+;; (allow network-outbound (remote ip "::1:*"))
+;; (allow network-outbound (remote unix-socket))
+
+;; --- Process exec restrictions (optional) ---------------------------------
+;;
+;; If you also want to make Bash safer when `allow_shell=true`, uncomment to
+;; restrict process-exec to a known set of binaries. This is FS-based ACLs on
+;; the executable, not a syscall filter, so the model can still run any
+;; allowed binary with any arguments — pair with audit-log inspection.
+;;
+;; (deny process-exec)
+;; (allow process-exec (literal "/bin/sh"))
+;; (allow process-exec (literal "/bin/bash"))
+;; (allow process-exec (literal "/usr/bin/env"))
+;; (allow process-exec (subpath "/opt/homebrew/bin"))
+;; (allow process-exec (subpath "/usr/local/bin"))
+;; (allow process-exec (subpath "/usr/bin"))

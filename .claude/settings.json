@@ -9,7 +9,12 @@
       "Bash(bun -e \"const j=JSON.parse\\(await Bun.stdin.text\\(\\)\\); console.log\\('manual:', Object.keys\\(j.subtitles||{}\\).length, '| auto:', Object.keys\\(j.automatic_captions||{}\\).length\\);\")",
       "Bash(bun -e \"import {youtubeTranscriptTool as t} from './src/mcp/youtube.ts'; const r=await t.handler\\({url:'https://www.youtube.com/watch?v=2n41YjR5QfU', lang:'en', max_chars:200000}\\); await Bun.write\\('/tmp/yt-transcript.txt', r.content[0].text\\); console.log\\('written chars:', r.content[0].text.length\\);\")",
       "Bash(bun -e \"import {findYtDlpPath} from './src/mcp/youtube.ts'; console.log\\(findYtDlpPath\\(\\)\\);\")",
-      "Bash(bun -e \"import {youtubeTranscriptTool as t} from './src/mcp/youtube.ts'; const r=await t.handler\\({url:'https://youtu.be/aircAruvnKk'}\\); console.log\\('isError:', r.isError??false\\); console.log\\(r.content[0].text.slice\\(0,100\\)\\);\")"
+      "Bash(bun -e \"import {youtubeTranscriptTool as t} from './src/mcp/youtube.ts'; const r=await t.handler\\({url:'https://youtu.be/aircAruvnKk'}\\); console.log\\('isError:', r.isError??false\\); console.log\\(r.content[0].text.slice\\(0,100\\)\\);\")",
+      "mcp__marsclaw__send_message",
+      "WebFetch(domain:docs.nvidia.com)",
+      "Bash(chmod +x tools/sandbox/run-macos.sh tools/sandbox/run-linux.sh)",
+      "Bash(bash -n tools/sandbox/run-macos.sh)",
+      "Bash(bash -n tools/sandbox/run-linux.sh)"
     ]
   }
 }
