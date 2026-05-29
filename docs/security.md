@@ -179,7 +179,7 @@ The agent subprocess is launched with a curated env ([claude-sdk.ts](https://git
 
 ### Kernel sandbox — `tools/sandbox/`
 
-- **macOS**: `marsclaw.sb` — a deny-default `sandbox-exec` profile. Credential paths (`.env`, `~/.claude.json`, `~/.gemini`, Keychain, `~/.ssh`) are denied at the kernel, so `allow_shell=true` no longer means "shell can `cat .env`".
+- **macOS**: `marsclaw.sb` — a deny-default `sandbox-exec` profile providing **write confinement** (a hijacked shell can only write `data/`, `logs/`, `tmp`), **network containment** (loopback-only when egress is enforced), and denies of pivot paths the bot never needs (`~/.ssh`, browser cookies). It does **not** kernel-deny the bot's own credentials (`.env`, `~/.claude.json`, `~/.gemini`, `data/whatsapp-auth`, Keychain) — the bot reads those to function (denying `.env` makes Bun abort at launch), so kernel-protecting them requires **identity separation** (running the agent as a different user / in a container) or the full credential-isolation layer. Protection for those files against the agent still comes from the in-process sensitive-path gate + shell-off-by-default. This is the strongest argument for the containerized approach — see [vs-nanoclaw.md](vs-nanoclaw.md).
 - **Linux**: `run-linux.sh` — bubblewrap with tmpfs `$HOME` (credentials don't exist in the namespace), read-only system + source, dropped caps; `seccomp.json` denies `ptrace`/`mount`/`setns`/`bpf`/… .
 
 ### Per-call mutation approval — `mutation_approval: "all"`

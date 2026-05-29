@@ -13,9 +13,13 @@
 ;;      for "deny" lines naming the operation + target.
 ;;   3. Add a matching (allow …) below, restart, repeat until it boots clean.
 ;;
-;; The security-critical rules are the credential DENIES near the end and the
-;; (optional) loopback-only network block — those survive no matter how many
-;; allows you add above them, because later matching rules win in SBPL.
+;; The real protections here are WRITE confinement, network containment (the
+;; optional loopback-only block), and denies of pivot paths the bot never needs
+;; (SSH keys, cookies). NOTE: the bot's own credentials (.env, ~/.claude.json,
+;; data/whatsapp-auth, Keychain) are intentionally NOT denied — the bot reads
+;; them to function, and denying .env makes Bun abort at launch. Kernel-denying
+;; those needs identity separation (container) or the credential-isolation
+;; layer. See the DENIES section at the bottom for the full rationale.
 ;;
 ;; Usage: sandbox-exec -f marsclaw.sb -D PROJECT=$PWD -D HOME=$HOME bun run src/cli/index.ts start
 
@@ -69,25 +73,36 @@
 (allow ipc-posix-shm)
 
 ;; ===========================================================================
-;; SECURITY-CRITICAL DENIES — last-match-wins, so these override the broad
-;; reads above. This is the actual point of the sandbox: even a hijacked agent
-;; with shell cannot read these.
+;; DENIES — last-match-wins, so these override the broad reads above.
+;;
+;; IMPORTANT — what this sandbox can and cannot protect, and WHY:
+;;
+;; The agent runs INSIDE the bot's own process. So any credential the BOT needs
+;; to function, the agent's process can necessarily reach — you cannot kernel-
+;; deny the bot its own secrets without breaking the bot. Concretely, these are
+;; NOT denied because the bot legitimately reads them at startup/runtime:
+;;   - .env            → Bun auto-loads it for config (MARSCLAW_*, OAuth client
+;;                        id/secret). Denying it makes Bun ABORT at launch
+;;                        (EPERM, not ENOENT) — the bot can't even start.
+;;   - ~/.claude.json, ~/.gemini → the agent SDK reads these for auth.
+;;   - data/whatsapp-auth        → Baileys reads/writes its session here.
+;;   - ~/Library/Keychains       → Google OAuth tokens (via securityd).
+;; To kernel-deny THOSE you need identity separation (the agent running as a
+;; different user / in a container), or the full credential-isolation layer
+;; (LLM proxy + .env-via-env + Google-auth-via-broker). See docs/security.md.
+;;
+;; What this sandbox DOES still buy you, even with the bot's creds readable:
+;;   - write confinement (a hijacked shell can only write data/, logs/, tmp)
+;;   - network containment (uncomment the loopback-only block above once the
+;;     egress gateway is enforced)
+;;   - denies pivot targets the bot never touches (SSH keys, browser cookies)
+;;   - the OS-level process/exec/mach baseline of deny-default
+;;
+;; So we deny only paths the bot has no legitimate need for:
 ;; ===========================================================================
-(deny file-read* file-write*
-  (literal (string-append (param "PROJECT") "/.env")))
-(deny file-read* file-write*
-  (subpath (string-append (param "PROJECT") "/data/secrets")))
-(deny file-read* file-write*
-  (subpath (string-append (param "PROJECT") "/data/whatsapp-auth")))
-(deny file-read* file-write*
-  (literal (string-append (param "HOME") "/.claude.json")))
-(deny file-read* file-write*
-  (subpath (string-append (param "HOME") "/.claude")))
-(deny file-read* file-write*
-  (subpath (string-append (param "HOME") "/.gemini")))
-(deny file-read* file-write*
-  (subpath (string-append (param "HOME") "/Library/Keychains")))
 (deny file-read* file-write*
   (subpath (string-append (param "HOME") "/.ssh")))
 (deny file-read* file-write*
   (subpath (string-append (param "HOME") "/Library/Cookies")))
+(deny file-read* file-write*
+  (subpath (string-append (param "PROJECT") "/data/secrets")))  ;; Linux-only creds; empty on macOS
